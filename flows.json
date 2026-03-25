@@ -1,0 +1,237 @@
+[
+    {
+        "id": "b66064878030b741",
+        "type": "tab",
+        "label": "HTL-N-P1-103",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "fd407c03c80b70fc",
+        "type": "mqtt-broker",
+        "name": "MaQiaTTo Cloud",
+        "broker": "${MQTT_BROKER}",
+        "port": "1883",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "tls": "",
+        "protocolVersion": 4,
+        "keepalive": 60,
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": "",
+        "user": "${MQTT_USER}",
+        "password": "${MQTT_PASS}"
+    },
+    {
+        "id": "dc894a20e3d20a4d",
+        "type": "mqtt in",
+        "z": "b66064878030b741",
+        "name": "alertas",
+        "topic": "iot/HTL-N-P1-103",
+        "qos": "1",
+        "datatype": "auto-detect",
+        "broker": "fd407c03c80b70fc",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 170,
+        "y": 160,
+        "wires": [
+            [
+                "eb0e2bb6ad3b2e33"
+            ]
+        ]
+    },
+    {
+        "id": "eb0e2bb6ad3b2e33",
+        "type": "json",
+        "z": "b66064878030b741",
+        "name": "parse json alertas",
+        "property": "payload",
+        "action": "obj",
+        "pretty": false,
+        "x": 360,
+        "y": 160,
+        "wires": [
+            [
+                "eb9ff278941b9aa1"
+            ]
+        ]
+    },
+    {
+        "id": "eb9ff278941b9aa1",
+        "type": "switch",
+        "z": "b66064878030b741",
+        "name": "ESTADOS",
+        "property": "payload.estado_riesgo",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "NORMAL",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "ALERTA",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "EMERGENCIA",
+                "vt": "str"
+            },
+            {
+                "t": "else"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 4,
+        "x": 570,
+        "y": 160,
+        "wires": [
+            [ "debug_normal" ],
+            [ "debug_alerta" ],
+            [ "debug_emergencia" ],
+            [ "debug_invalido" ]
+        ]
+    },
+    {
+        "id": "debug_normal",
+        "type": "debug",
+        "z": "b66064878030b741",
+        "name": "debug NORMAL",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 800,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "debug_alerta",
+        "type": "debug",
+        "z": "b66064878030b741",
+        "name": "debug ALERTA",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 800,
+        "y": 140,
+        "wires": []
+    },
+    {
+        "id": "debug_emergencia",
+        "type": "debug",
+        "z": "b66064878030b741",
+        "name": "debug EMERGENCIA",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 820,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "debug_invalido",
+        "type": "debug",
+        "z": "b66064878030b741",
+        "name": "debug OTROS/INVALIDO",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "x": 830,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "74c90568d7fd1fd1",
+        "type": "inject",
+        "z": "b66064878030b741",
+        "name": "INICIAR",
+        "props": [
+            { "p": "payload" },
+            { "p": "topic", "vt": "str" }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "iot/HTL-N-P1-103/comandos",
+        "payload": "{\"msg\":\"INICIAR\"}",
+        "payloadType": "json",
+        "x": 200,
+        "y": 300,
+        "wires": [
+            [ "c9515bd067411007" ]
+        ]
+    },
+    {
+        "id": "0c415e50bcebf055",
+        "type": "inject",
+        "z": "b66064878030b741",
+        "name": "PAUSA",
+        "props": [
+            { "p": "payload" },
+            { "p": "topic", "vt": "str" }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "iot/HTL-N-P1-103/comandos",
+        "payload": "{\"msg\":\"PAUSA\"}",
+        "payloadType": "json",
+        "x": 200,
+        "y": 340,
+        "wires": [
+            [ "c9515bd067411007" ]
+        ]
+    },
+    {
+        "id": "c9515bd067411007",
+        "type": "mqtt out",
+        "z": "b66064878030b741",
+        "name": "comandos",
+        "topic": "iot/HTL-N-P1-103/comandos",
+        "qos": "1",
+        "retain": "false",
+        "broker": "fd407c03c80b70fc",
+        "x": 420,
+        "y": 320,
+        "wires": []
+    }
+]
