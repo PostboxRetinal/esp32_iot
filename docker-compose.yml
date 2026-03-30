@@ -1,0 +1,47 @@
+services:
+  nodered:
+    image: nodered/node-red:latest
+    container_name: nodered-hotel
+    restart: unless-stopped
+    ports:
+      - "1880:1880"
+    env_file:
+      - .env
+    environment:
+      - TZ=America/Bogota
+      - FLOWS=flows.json
+      - MQTT_SERVER=${MQTT_SERVER}
+      - MQTT_PORT=${MQTT_PORT}
+      - MQTT_BROKER_URL=${MQTT_BROKER_URL}
+      - MQTT_USER=${MQTT_USER}
+      - MQTT_PASS=${MQTT_PASS}
+      - TOPICO_DATOS=${TOPICO_DATOS}
+      - TOPICO_COMANDOS=${TOPICO_COMANDOS}
+      - CMD_COOLDOWN_MS=${CMD_COOLDOWN_MS}
+      - UMBRAL_MQ135_PELIGRO=${UMBRAL_MQ135_PELIGRO}
+      - UMBRAL_MQ7_PELIGRO=${UMBRAL_MQ7_PELIGRO}
+      - UMBRAL_TEMP_INCENDIO=${UMBRAL_TEMP_INCENDIO}
+      - PH3_PEL_PPM=${PH3_PEL_PPM}
+      - PH3_STEL_PPM=${PH3_STEL_PPM}
+      - PH3_IRRIT_LOW_PPM=${PH3_IRRIT_LOW_PPM}
+      - PH3_IRRIT_HIGH_PPM=${PH3_IRRIT_HIGH_PPM}
+      - PH3_IDLH_PPM=${PH3_IDLH_PPM}
+      - PH3_LETHAL_LOW_PPM=${PH3_LETHAL_LOW_PPM}
+      - CO_PEL_PPM=${CO_PEL_PPM}
+      - CO_HEADACHE_PPM=${CO_HEADACHE_PPM}
+      - CO_STEL_PPM=${CO_STEL_PPM}
+      - CO_SEVERE_PPM=${CO_SEVERE_PPM}
+      - CO_IDLH_PPM=${CO_IDLH_PPM}
+      - TEMP_ALERTA_C=${TEMP_ALERTA_C}
+      - MQ135_RAW_MIN=${MQ135_RAW_MIN}
+      - MQ135_RAW_MAX=${MQ135_RAW_MAX}
+      - MQ7_RAW_MIN=${MQ7_RAW_MIN}
+      - MQ7_RAW_MAX=${MQ7_RAW_MAX}
+      - PH3_PPM_MAX_EST=${PH3_PPM_MAX_EST}
+      - CO_PPM_MAX_EST=${CO_PPM_MAX_EST}
+    volumes:
+      - nodered_data:/data
+      - ./flows.json:/data/flows.json:Z
+
+volumes:
+  nodered_data:
