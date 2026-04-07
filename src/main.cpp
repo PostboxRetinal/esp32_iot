@@ -4,7 +4,7 @@
 #include <DHT.h>
 #include <WiFi.h>
 #include <time.h>
-#include "config.h"
+#include <config.h>
 
 // ==========================================
 // 1. ASIGNACIÓN DE PINES
@@ -16,15 +16,12 @@
 #define LED_INTEGRADO       2
 
 // ==========================================
-// 2. CONFIGURACIÓN DE UMBRALES DE RIESGO
+// 2. FRECUENCIA DE ENVÍO DE TELEMETRÍA (RAW)
 // ==========================================
-const int UMBRAL_MQ135_PELIGRO = 2500;
-const int UMBRAL_MQ7_PELIGRO = 2000;
-const float UMBRAL_TEMP_INCENDIO = 45.0;
-
-const unsigned long INTERVALO_ENVIO_MS_LIBRE = 2500;
-const unsigned long INTERVALO_ENVIO_MS_RESERVADA = 2000;
-const unsigned long INTERVALO_ENVIO_MS_FUMIGACION = 1200;
+const unsigned long INTERVALO_ENVIO_DEFAULT_MS = 15000;
+const unsigned long INTERVALO_ENVIO_MIN_MS = 1000;
+const unsigned long INTERVALO_ENVIO_MAX_MS = 60000;
+unsigned long intervaloEnvioMs = INTERVALO_ENVIO_DEFAULT_MS;
 
 // Variable global que guarda el contexto del sistema externo
 String estadoHabitacion = "LIBRE"; // Estados posibles: "LIBRE", "RESERVADA", "FUMIGACION"
@@ -54,7 +51,6 @@ PubSubClient mqttClient(espClient);
 
 void reconnect();
 void setup_wifi();
-unsigned long getIntervaloEnvioMs(const String& contextoHabitacion);
 
 const long GMT_OFFSET_SEC = -5 * 3600;  // UTC-5
 const int DAYLIGHT_OFFSET_SEC = 0;
@@ -86,18 +82,6 @@ void parpadearLedFeedback(int veces = 2, int onMs = 100, int offMs = 100) {
   }
 }
 
-unsigned long getIntervaloEnvioMs(const String& contextoHabitacion) {
-  if (contextoHabitacion == "FUMIGACION") {
-    return INTERVALO_ENVIO_MS_FUMIGACION;
-  }
-
-  if (contextoHabitacion == "RESERVADA") {
-    return INTERVALO_ENVIO_MS_RESERVADA;
-  }
-
-  return INTERVALO_ENVIO_MS_LIBRE;
-}
-
 // ==========================================
 // 4. CALLBACK: ESCUCHA DEL SISTEMA EXTERNO
 // ==========================================
@@ -121,23 +105,47 @@ void callback(char* topic, byte* payload, unsigned int length) {
     return;
   }
 
+  bool procesado = false;
+
   String comando = docCmd["msg"] | "";
   if (comando == "PAUSA") {
     sistemaActivo = false;
     Serial.println("SISTEMA PAUSADO");
-    return;
+    procesado = true;
   }
   if (comando == "INICIAR") {
     sistemaActivo = true;
     Serial.println("SISTEMA INICIADO");
-    return;
+    procesado = true;
+  }
+
+  long nuevoIntervaloMs = -1;
+  if (!docCmd["sample_interval_ms"].isNull()) {
+    nuevoIntervaloMs = docCmd["sample_interval_ms"].as<long>();
+  } else if (!docCmd["intervalo_ms"].isNull()) {
+    nuevoIntervaloMs = docCmd["intervalo_ms"].as<long>();
+  }
+
+  if (nuevoIntervaloMs > 0) {
+    unsigned long clamped = (unsigned long)nuevoIntervaloMs;
+    if (clamped < INTERVALO_ENVIO_MIN_MS) clamped = INTERVALO_ENVIO_MIN_MS;
+    if (clamped > INTERVALO_ENVIO_MAX_MS) clamped = INTERVALO_ENVIO_MAX_MS;
+
+    intervaloEnvioMs = clamped;
+    Serial.print("Frecuencia de muestreo actualizada a: ");
+    Serial.print(intervaloEnvioMs);
+    Serial.println(" ms");
+    procesado = true;
   }
 
   String nuevoEstado = docCmd["estado"] | "";
   if (nuevoEstado == "LIBRE" || nuevoEstado == "RESERVADA" || nuevoEstado == "FUMIGACION") {
     estadoHabitacion = nuevoEstado;
     Serial.println("Contexto de habitacion actualizado a: " + estadoHabitacion);
-  } else {
+    procesado = true;
+  }
+
+  if (!procesado) {
     Serial.println("ERROR: Comando/estado desconocido. Ignorando...");
   }
 }
@@ -220,10 +228,9 @@ void loop() {
     return;
   }
 
-  // 3. Temporizador NO bloqueante (intervalo dinámico según estado)
+  // 3. Temporizador NO bloqueante (intervalo fijo)
   static unsigned long lastReadMs = 0;
-  static unsigned long intervaloEnvioActualMs = INTERVALO_ENVIO_MS_LIBRE;
-  if (millis() - lastReadMs < intervaloEnvioActualMs) return;
+  if (millis() - lastReadMs < intervaloEnvioMs) return;
   lastReadMs = millis();
 
   // 4. Leer sensores
@@ -245,51 +252,27 @@ void loop() {
   }
 
   // ==========================================
-  // 5. INTELIGENCIA DE CONTEXTO (Context-Awareness)
-  // ==========================================
-  String estadoRiesgo = "NORMAL";
-
-  if (estadoHabitacion == "FUMIGACION") {
-
-    if (motion) {
-      estadoRiesgo = "CRITICO: INTRUSO EN FUMIGACION";
-    } else if (temperature > UMBRAL_TEMP_INCENDIO) {
-      estadoRiesgo = "CRITICO: FUEGO DURANTE FUMIGACION";
-    } else {
-      estadoRiesgo = "OPERACION_FUMIGACION_ACTIVA";
-    }
-  } 
-  else { 
-    if (sensorMQ135 >= UMBRAL_MQ135_PELIGRO) {
-      estadoRiesgo = "CRITICO: FUGA DE FOSFINA/HUMO";
-    } else if (sensorMQ7 >= UMBRAL_MQ7_PELIGRO) {
-      estadoRiesgo = "CRITICO: MONOXIDO DE CARBONO ALTO";
-    } else if (temperature >= UMBRAL_TEMP_INCENDIO) {
-      estadoRiesgo = "CRITICO: CONATO DE INCENDIO";
-    }
-  }
-
-  intervaloEnvioActualMs = getIntervaloEnvioMs(estadoHabitacion);
-
-  // ==========================================
-  // 6. CREAR Y ENVIAR JSON
+  // 5. CREAR Y ENVIAR JSON (RAW, sin lógica de riesgo)
   // ==========================================
   JsonDocument doc;
   String timestamp = getUtcOffsetIsoTimestamp();
   doc["timestamp"] = timestamp;
+  doc["habitacion"] = "HTL-N-P1-103";
+  doc["contexto_hotel"] = estadoHabitacion;
+  doc["sistema_activo"] = sistemaActivo;
+  doc["intervalo_envio_ms"] = intervaloEnvioMs;
+  doc["fosfina_mq135"] = sensorMQ135;
+  doc["co_mq7"] = sensorMQ7;
+  doc["presencia_pir"] = motion;
+  if (event) doc["evento_pir"] = event;
 
   if (isnan(humidity) || isnan(temperature)) {
     doc["error"] = "Fallo lectura DHT11";
+    doc["dht_ok"] = false;
   } else {
-    doc["habitacion"]       = "HTL-N-P1-103";
-    doc["contexto_hotel"]   = estadoHabitacion;  // LIBRE, RESERVADA, FUMIGACION
-    doc["nivel_alerta"]     = estadoRiesgo;      // NORMAL, CRITICO, etc.
-    doc["temperatura_C"]    = temperature;
-    doc["humedad_pct"]      = humidity;
-    doc["fosfina_mq135"]    = sensorMQ135;
-    doc["co_mq7"]           = sensorMQ7;
-    doc["presencia_pir"]    = motion;
-    if (event) doc["evento_pir"] = event;
+    doc["dht_ok"] = true;
+    doc["temperatura_C"] = temperature;
+    doc["humedad_pct"] = humidity;
   }
 
   char outBuf[512];

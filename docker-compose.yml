@@ -1,14 +1,46 @@
 services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-ciudad-inteligente
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - TZ=${TZ:-America/Bogota}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-ciudad_inteligente}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init-db.sql:/docker-entrypoint-initdb.d/01-init-db.sql:ro,Z
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 25s
+    networks:
+      - backend
+
   nodered:
-    image: nodered/node-red:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.nodered
+    image: nodered-hotel:mysql
     container_name: nodered-hotel
     restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
     ports:
       - "1880:1880"
     env_file:
       - .env
     environment:
-      - TZ=America/Bogota
+      - TZ=${TZ:-America/Bogota}
       - FLOWS=flows.json
       - MQTT_SERVER=${MQTT_SERVER}
       - MQTT_PORT=${MQTT_PORT}
@@ -39,9 +71,30 @@ services:
       - MQ7_RAW_MAX=${MQ7_RAW_MAX}
       - PH3_PPM_MAX_EST=${PH3_PPM_MAX_EST}
       - CO_PPM_MAX_EST=${CO_PPM_MAX_EST}
+      - MYSQL_HOST=${MYSQL_HOST:-mysql}
+      - MYSQL_PORT=${MYSQL_PORT:-3306}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-ciudad_inteligente}
+      - NODE_RED_CREDENTIAL_SECRET=${NODE_RED_CREDENTIAL_SECRET:-ciudad-inteligente-secret-2024}
     volumes:
       - nodered_data:/data
       - ./flows.json:/data/flows.json:Z
+      - ./settings.js:/data/settings.js:Z
+      - ./flows_cred.json:/data/flows_cred.json:Z
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:1880 || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - backend
 
 volumes:
   nodered_data:
+  mysql_data:
+
+networks:
+  backend:
+    driver: bridge
