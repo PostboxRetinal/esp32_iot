@@ -453,64 +453,6 @@
         "wires": []
     },
     {
-        "id": "1c126be886d65ba9",
-        "type": "inject",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "INICIAR",
-        "props": [
-            {
-                "p": "payload"
-            },
-            {
-                "p": "topic",
-                "vt": "str"
-            }
-        ],
-        "repeat": "",
-        "crontab": "",
-        "once": false,
-        "onceDelay": 0.1,
-        "topic": "${TOPICO_COMANDOS}",
-        "payload": "{\"msg\":\"INICIAR\"}",
-        "payloadType": "json",
-        "x": 200,
-        "y": 300,
-        "wires": [
-            [
-                "80fc9f72dc148d75"
-            ]
-        ]
-    },
-    {
-        "id": "2bc833c492a993b5",
-        "type": "inject",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "PAUSA",
-        "props": [
-            {
-                "p": "payload"
-            },
-            {
-                "p": "topic",
-                "vt": "str"
-            }
-        ],
-        "repeat": "",
-        "crontab": "",
-        "once": false,
-        "onceDelay": 0.1,
-        "topic": "${TOPICO_COMANDOS}",
-        "payload": "{\"msg\":\"PAUSA\"}",
-        "payloadType": "json",
-        "x": 200,
-        "y": 340,
-        "wires": [
-            [
-                "80fc9f72dc148d75"
-            ]
-        ]
-    },
-    {
         "id": "5f140744d347019a",
         "type": "inject",
         "z": "b7d6c0b9c8cf00d5",
@@ -640,8 +582,8 @@
         "id": "a1b2c3d4e5f60111",
         "type": "mqtt-broker",
         "name": "Maqiatto Broker",
-        "broker": "${MQTT_SERVER}",
-        "port": "${MQTT_PORT}",
+        "broker": "maqiatto.com",
+        "port": "1883",
         "clientid": "",
         "autoConnect": true,
         "usetls": false,
@@ -666,8 +608,8 @@
         "willMsg": {},
         "userProps": "",
         "sessionExpiry": "",
-        "user": "${MQTT_USER}",
-        "password": "${MQTT_PASS}"
+        "user": "alejandro.bravo_isa@uao.edu.co",
+        "password": "maqiatto123"
     },
     {
         "id": "d9f3d61e3a4c0aaa",
