@@ -1,0 +1,9 @@
+{
+  "name": "fiot-garage-nodered",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Node-RED dependencies for Parcial2 IoT Garage",
+  "dependencies": {
+    "node-red-node-mysql": "^2.0.0"
+  }
+}

@@ -1,0 +1,63 @@
+services:
+  mariadb:
+    image: mariadb:11.4
+    container_name: fiot-mariadb
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change_me_root}
+      MARIADB_DATABASE: ${MYSQL_DATABASE:-fiot_garage}
+      MARIADB_USER: ${MYSQL_USER:-fiot_app}
+      MARIADB_PASSWORD: ${MYSQL_PASSWORD:-change_me_fiot_app}
+      TZ: ${TZ:-America/Bogota}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ../database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro,Z
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mariadb-admin ping -h 127.0.0.1 -uroot -p\"$${MARIADB_ROOT_PASSWORD}\" --silent",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  nodered:
+    build:
+      context: ../nodered
+      dockerfile: Dockerfile
+    image: fiot-nodered:4.1.8-22
+    container_name: fiot-nodered
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      TZ: ${TZ:-America/Bogota}
+      MQTT_BROKER_HOST: ${MQTT_BROKER_HOST:-maqiatto.com}
+      MQTT_BROKER_PORT: ${MQTT_BROKER_PORT:-1883}
+      MQTT_NODERED_USER: ${MQTT_NODERED_USER:-nodered}
+      MQTT_NODERED_PASSWORD: ${MQTT_NODERED_PASSWORD:-change_me_nodered}
+      MQTT_TOPIC_BASE: ${MQTT_TOPIC_BASE:-your_maqiatto_username/fiot/garage}
+      MYSQL_HOST: ${MYSQL_HOST:-mariadb}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-fiot_garage}
+      MYSQL_USER: ${MYSQL_USER:-fiot_app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change_me_fiot_app}
+      HARDWARE_DEVICE_ID: ${HARDWARE_DEVICE_ID:-ESP32-GARAGE-CO-001}
+      SIM_DEVICE_ID: ${SIM_DEVICE_ID:-SIM-GARAGE-CO-001}
+      NR_AUTO_IMPORT: ${NR_AUTO_IMPORT:-true}
+      NR_FORCE_IMPORT: ${NR_FORCE_IMPORT:-false}
+    ports:
+      - "1880:1880"
+    volumes:
+      - nodered_data:/data
+    depends_on:
+      - mariadb
+
+volumes:
+  mariadb_data:
+  nodered_data:
