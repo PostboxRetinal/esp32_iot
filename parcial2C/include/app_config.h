@@ -28,6 +28,16 @@
 #define WIFI_CONNECT_TIMEOUT_MS 20000UL
 #define MQ7_WARMUP_MS 10000UL
 
+// -------- CO thresholds for demo (PPM) --------
+// LED mapping on ESP32:
+// - SEGURO: LED_WHITE
+// - PRECAUCION: LED_GREEN
+// - PELIGRO/CRITICO: LED_RED (CRITICO blinking)
+#define CO_SEGURO_MAX_PPM 8.0f
+#define CO_PRECAUCION_MAX_PPM 14.0f
+#define CO_PELIGRO_MAX_PPM 22.0f
+#define CO_URGENTE_MIN_PPM CO_PELIGRO_MAX_PPM
+
 // -------- MQ-7 calibration constants --------
 #define RO 10.0f
 #define MQ7_ADC_REF_VOLTAGE 3.3f

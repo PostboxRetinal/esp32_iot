@@ -62,7 +62,7 @@ Luego compilar/subir con PlatformIO y abrir monitor serie.
 - En MariaDB verificar inserciones en:
   - `sensor_readings`
   - `state_events`
-  - `alerts` (solo cuando CO >= 30)
+  - `alerts` (solo cuando CO >= 22)
 
 ## 6) Consideraciones de seguridad mínima
 

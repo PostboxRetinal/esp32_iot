@@ -130,15 +130,15 @@ void ensureMqttConnection() {
 String clasificarEstado(float co_ppm, int pir) {
   String estado;
 
-  if (co_ppm < 10) {
+  if (co_ppm < CO_SEGURO_MAX_PPM) {
     estado = "SEGURO";
     setLED(1, 0, 0);
     ledState = false;
-  } else if (co_ppm < 15) {
+  } else if (co_ppm < CO_PRECAUCION_MAX_PPM) {
     estado = "PRECAUCION";
     setLED(0, 1, 0);
     ledState = false;
-  } else if (co_ppm < 30) {
+  } else if (co_ppm < CO_PELIGRO_MAX_PPM) {
     estado = "PELIGRO";
     setLED(0, 0, 1);
     ledState = false;
@@ -151,7 +151,7 @@ String clasificarEstado(float co_ppm, int pir) {
     }
   }
 
-  if (pir == 1 && co_ppm >= 30) {
+  if (pir == 1 && co_ppm >= CO_URGENTE_MIN_PPM) {
     estado += "_URGENTE";
   }
 

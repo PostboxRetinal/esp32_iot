@@ -48,18 +48,18 @@ Ambos publican telemetría de CO/PIR vía MQTT usando Maqiatto como broker exter
 
 Umbrales de CO (PPM):
 
-- `< 10`  -> `SEGURO`
-- `10–14.99` -> `PRECAUCION`
-- `15–29.99` -> `PELIGRO`
-- `>= 30` -> `CRITICO`
+- `< 8`  -> `SEGURO`
+- `8–13.99` -> `PRECAUCION`
+- `14–21.99` -> `PELIGRO`
+- `>= 22` -> `CRITICO`
 
 Regla de urgencia:
 
-- Si `presencia == SI` y `co_ppm >= 30` -> estado `CRITICO_URGENTE`
+- Si `presencia == SI` y `co_ppm >= 22` -> estado `CRITICO_URGENTE`
 
 Regla de alerta:
 
-- Generar alerta cuando `co_ppm >= 30`
+- Generar alerta cuando `co_ppm >= 22`
 - Severidad `CRITICAL` si además `presencia == SI`, de lo contrario `HIGH`
 
 ## Seguridad y confiabilidad aplicadas
