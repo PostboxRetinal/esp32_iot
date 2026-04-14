@@ -1,5 +1,0 @@
-FROM nodered/node-red:latest
-
-USER root
-RUN npm install -g npm@latest
-RUN npm install node-red-node-mysql@latest && npm cache clean --force

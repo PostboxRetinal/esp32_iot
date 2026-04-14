@@ -1,9 +1,0 @@
-{
-    "d9f3d61e3a4c0aaa": {
-        "_cert": "",
-        "user": "nodered_user",
-        "password": "nodered_password_change_me",
-        "iv": "3d7c25a836687322f728b7961f296f00",
-        "token": "eb4657239b3db61a633a0b7fa72d53bddd24cdd14fa19f8e9f3cef034445a0c14870a0d23609c8935212f60ab1ca585c35f8d2e9eb9d1132d3a122304601eaa1"
-    }
-}
