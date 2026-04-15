@@ -40,7 +40,7 @@ Ambos publican telemetría de CO/PIR vía MQTT usando Maqiatto como broker exter
 1. ESP32 lee MQ-7 y PIR cada 5 segundos.
 2. Firmware clasifica estado (`SEGURO`, `PRECAUCION`, `PELIGRO`, `CRITICO`) y aplica urgencia cuando hay presencia con CO crítico (`CRITICO_URGENTE`).
 3. ESP32 publica JSON en `fiot/garage/<device_id>/telemetry`.
-4. Node-RED consume `fiot/garage/+/telemetry`, valida payload, recalcula estado/urgencia (validación server-side) y enruta por `device_id`.
+4. Node-RED consume `fiot/garage/+/telemetry`, valida payload, recalcula estado/urgencia (validación server-side) con umbrales tomados desde `include/app_config.h` y enruta por `device_id`.
 5. Node-RED inserta en MySQL tablas de lecturas, estados y alertas.
 6. Cuando aplica alerta, Node-RED publica evento en `fiot/garage/alerts/<device_id>`.
 
@@ -48,18 +48,23 @@ Ambos publican telemetría de CO/PIR vía MQTT usando Maqiatto como broker exter
 
 Umbrales de CO (PPM):
 
-- `< 8`  -> `SEGURO`
-- `8–13.99` -> `PRECAUCION`
-- `14–21.99` -> `PELIGRO`
-- `>= 22` -> `CRITICO`
+- `< CO_SEGURO_MAX_PPM`  -> `SEGURO`
+- `CO_SEGURO_MAX_PPM .. < CO_PRECAUCION_MAX_PPM` -> `PRECAUCION`
+- `CO_PRECAUCION_MAX_PPM .. < CO_PELIGRO_MAX_PPM` -> `PELIGRO`
+- `>= CO_PELIGRO_MAX_PPM` -> `CRITICO`
+
+Fuente única de estos umbrales:
+
+- Firmware: `include/app_config.h`
+- Node-RED: al importar el flujo, `nodered/seed-data.js` lee `app_config.h` y reemplaza tokens del template para mantener consistencia.
 
 Regla de urgencia:
 
-- Si `presencia == SI` y `co_ppm > 22` -> estado `CRITICO_URGENTE`
+- Si `presencia == SI` y `co_ppm > CO_URGENTE_MIN_PPM` -> estado `CRITICO_URGENTE`
 
 Regla de alerta:
 
-- Generar alerta cuando `co_ppm >= 22`
+- Generar alerta cuando `co_ppm >= CO_PELIGRO_MAX_PPM`
 - Severidad `CRITICAL` si además `presencia == SI`, de lo contrario `HIGH`
 
 Nota de conversión MQ-7:

@@ -33,6 +33,7 @@ Detener y limpiar:
 1. En el primer arranque (volumen `nodered_data` vacío), el contenedor carga automáticamente:
   - `flows.json` en `/data/flows.json`
   - credenciales MQTT/MySQL en `/data/flows_cred.json` usando variables de `infrastructure/.env`
+  - umbrales de CO (`CO_SEGURO_MAX_PPM`, `CO_PRECAUCION_MAX_PPM`, `CO_PELIGRO_MAX_PPM`, `CO_URGENTE_MIN_PPM`) leyendo `include/app_config.h` montado en `/opt/fiot-seed/app_config.h`
 2. No es necesario importar desde la UI de Node-RED para arrancar el flujo base.
 3. El seed se ejecuta una sola vez por volumen. Para forzar recarga del flujo:
   - establecer `NR_FORCE_IMPORT=true` en `.env` y reiniciar Node-RED, o

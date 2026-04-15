@@ -55,6 +55,7 @@ services:
       - "1880:1880"
     volumes:
       - nodered_data:/data
+      - ../include/app_config.h:/opt/fiot-seed/app_config.h:ro,Z
     depends_on:
       - mariadb
 
