@@ -55,12 +55,16 @@ Umbrales de CO (PPM):
 
 Regla de urgencia:
 
-- Si `presencia == SI` y `co_ppm >= 22` -> estado `CRITICO_URGENTE`
+- Si `presencia == SI` y `co_ppm > 22` -> estado `CRITICO_URGENTE`
 
 Regla de alerta:
 
 - Generar alerta cuando `co_ppm >= 22`
 - Severidad `CRITICAL` si además `presencia == SI`, de lo contrario `HIGH`
+
+Nota de conversión MQ-7:
+
+- Si `raw_co_adc` llega a zona de saturación ADC (`>= 4090`), el firmware marca condición no confiable y aplica un fallback controlado de ppm para demo (`25.0`) manteniendo estado crítico.
 
 ## Seguridad y confiabilidad aplicadas
 

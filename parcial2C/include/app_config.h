@@ -26,20 +26,26 @@
 #define WIFI_RETRY_INTERVAL_MS 10000UL
 #define MQTT_RETRY_INTERVAL_MS 5000UL
 #define WIFI_CONNECT_TIMEOUT_MS 20000UL
-#define MQ7_WARMUP_MS 10000UL
+#define MQ7_WARMUP_MS 5000UL
 
 // -------- CO thresholds for demo (PPM) --------
-// LED mapping on ESP32:
-// - SEGURO: LED_WHITE
-// - PRECAUCION: LED_GREEN
-// - PELIGRO/CRITICO: LED_RED (CRITICO blinking)
 #define CO_SEGURO_MAX_PPM 8.0f
 #define CO_PRECAUCION_MAX_PPM 14.0f
 #define CO_PELIGRO_MAX_PPM 22.0f
+// URGENTE applies when presencia==SI and co_ppm > CO_URGENTE_MIN_PPM
 #define CO_URGENTE_MIN_PPM CO_PELIGRO_MAX_PPM
 
 // -------- MQ-7 calibration constants --------
 #define RO 10.0f
+#define MQ7_CURVE_A 99.042f
+#define MQ7_CURVE_B -1.518f
 #define MQ7_ADC_REF_VOLTAGE 3.3f
 #define MQ7_SENSOR_VCC_VOLTAGE 5.0f
 #define MQ7_LOAD_RESISTOR_KOHM 10.0f
+
+// Debug-friendly saturation handling
+#define MQ7_ADC_SATURATION_RAW 4090
+#define MQ7_SATURATED_FALLBACK_PPM (CO_URGENTE_MIN_PPM + 3.0f)
+
+// Startup LED validation sequence duration per color
+#define LED_SELF_TEST_MS 500UL

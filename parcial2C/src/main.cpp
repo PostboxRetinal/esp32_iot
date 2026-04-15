@@ -10,7 +10,7 @@
 #define PIR_PIN    5
 #define LED_WHITE  27
 #define LED_GREEN  14
-#define LED_RED    12
+#define LED_RED    16
 
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
@@ -22,6 +22,7 @@ unsigned long lastWifiRetryMs = 0;
 unsigned long lastMqttRetryMs = 0;
 bool ledState = false;
 uint32_t messageCounter = 0;
+bool mq7SaturationWarned = false;
 
 char topicTelemetry[96];
 char topicStatus[96];
@@ -34,6 +35,10 @@ void buildTopics() {
 }
 
 float calcularPPM(int rawValue) {
+  if (rawValue >= MQ7_ADC_SATURATION_RAW) {
+    return MQ7_SATURATED_FALLBACK_PPM;
+  }
+
   if (rawValue <= 0) {
     rawValue = 1;
   }
@@ -45,7 +50,7 @@ float calcularPPM(int rawValue) {
 
   float rs = (MQ7_SENSOR_VCC_VOLTAGE - voltage) / voltage * MQ7_LOAD_RESISTOR_KOHM;
   float ratio = rs / RO;
-  float ppm = 99.042f * pow(ratio, -1.518f);
+  float ppm = MQ7_CURVE_A * pow(ratio, MQ7_CURVE_B);
 
   if (isnan(ppm) || isinf(ppm) || ppm < 0.0f) {
     return 0.0f;
@@ -55,9 +60,20 @@ float calcularPPM(int rawValue) {
 }
 
 void setLED(bool w, bool g, bool r) {
-  digitalWrite(LED_WHITE, w);
-  digitalWrite(LED_GREEN, g);
-  digitalWrite(LED_RED,   r);
+  digitalWrite(LED_WHITE, w ? HIGH : LOW);
+  digitalWrite(LED_GREEN, g ? HIGH : LOW);
+  digitalWrite(LED_RED,   r ? HIGH : LOW);
+}
+
+void runLedSelfTest() {
+  Serial.println("[LED] Self-test: WHITE -> GREEN -> RED");
+  setLED(1, 0, 0);
+  delay(LED_SELF_TEST_MS);
+  setLED(0, 1, 0);
+  delay(LED_SELF_TEST_MS);
+  setLED(0, 0, 1);
+  delay(LED_SELF_TEST_MS);
+  setLED(0, 0, 0);
 }
 
 String getTimestamp() {
@@ -151,7 +167,7 @@ String clasificarEstado(float co_ppm, int pir) {
     }
   }
 
-  if (pir == 1 && co_ppm >= CO_URGENTE_MIN_PPM) {
+  if (pir == 1 && co_ppm > CO_URGENTE_MIN_PPM) {
     estado += "_URGENTE";
   }
 
@@ -166,6 +182,7 @@ void publishTelemetry(int rawCO, float co_ppm, int pir, const String& estado) {
   doc["presencia"] = (pir == 1) ? "SI" : "NO";
   doc["estado"] = estado;
   doc["raw_co_adc"] = rawCO;
+  doc["adc_saturated"] = (rawCO >= MQ7_ADC_SATURATION_RAW);
   doc["message_id"] = ++messageCounter;
 
   char payload[384];
@@ -213,6 +230,7 @@ void setup() {
   pinMode(LED_WHITE, OUTPUT);
   pinMode(LED_GREEN, OUTPUT);
   pinMode(LED_RED,   OUTPUT);
+  runLedSelfTest();
   setLED(1, 0, 0);
 
   buildTopics();
@@ -261,7 +279,7 @@ void setup() {
     connectMqtt();
   }
 
-  Serial.println("Calentando sensor MQ-7 (10s) ...");
+  Serial.println("Calentando sensor MQ-7 (5s) ...");
   delay(MQ7_WARMUP_MS);
   Serial.println("Sistema listo.");
 }
@@ -278,17 +296,24 @@ void loop() {
     publishHeartbeat();
   }
 
-  if (now - lastTelemetryMs < TELEMETRY_PUBLISH_INTERVAL_MS) {
-    delay(20);
-    return;
+  int rawCO = analogRead(MQ7_PIN);
+  if (rawCO >= MQ7_ADC_SATURATION_RAW) {
+    if (!mq7SaturationWarned) {
+      Serial.println("[MQ7] ADC saturado (raw ~4095). Revisa cableado/divisor a 3.3V. Aplicando fallback de ppm.");
+      mq7SaturationWarned = true;
+    }
+  } else {
+    mq7SaturationWarned = false;
   }
 
-  lastTelemetryMs = now;
-
-  int   rawCO  = analogRead(MQ7_PIN);
   float co_ppm = calcularPPM(rawCO);
-  int   pir    = digitalRead(PIR_PIN);
-
+  int pir = digitalRead(PIR_PIN);
   String estado = clasificarEstado(co_ppm, pir);
-  publishTelemetry(rawCO, co_ppm, pir, estado);
+
+  if (now - lastTelemetryMs >= TELEMETRY_PUBLISH_INTERVAL_MS) {
+    lastTelemetryMs = now;
+    publishTelemetry(rawCO, co_ppm, pir, estado);
+  }
+
+  delay(20);
 }
