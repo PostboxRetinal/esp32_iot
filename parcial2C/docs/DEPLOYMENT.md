@@ -7,6 +7,9 @@
 3. Si cambias usuario/clave en `.env`, no necesitas editar `docker-compose.yml` ni `nodered/flows.json`.
 4. Definir `MQTT_TOPIC_BASE` con prefijo de usuario Maqiatto, por ejemplo:
   - `tu_usuario_maqiatto/fiot/garage`
+5. Opcionalmente ajustar rama de comandos:
+  - `MQTT_COMMAND_TOPIC` (topic de publicación de comandos)
+  - `COMMANDS_ENABLED` (`true/false` para habilitar/deshabilitar publicación)
 
 ## 2) Levantar servicios
 
@@ -34,10 +37,13 @@ Detener y limpiar:
   - `flows.json` en `/data/flows.json`
   - credenciales MQTT/MySQL en `/data/flows_cred.json` usando variables de `infrastructure/.env`
   - umbrales de CO (`CO_SEGURO_MAX_PPM`, `CO_PRECAUCION_MAX_PPM`, `CO_PELIGRO_MAX_PPM`, `CO_URGENTE_MIN_PPM`) leyendo `include/app_config.h` montado en `/opt/fiot-seed/app_config.h`
+  - espera activa de MariaDB antes de iniciar Node-RED para evitar errores de conexión por arranque desfasado
 2. No es necesario importar desde la UI de Node-RED para arrancar el flujo base.
 3. El seed se ejecuta una sola vez por volumen. Para forzar recarga del flujo:
   - establecer `NR_FORCE_IMPORT=true` en `.env` y reiniciar Node-RED, o
   - eliminar el volumen `nodered_data` y volver a levantar el stack.
+
+> Importante: si ya tenías el volumen de MariaDB creado antes de esta versión, `schema.sql` no se vuelve a ejecutar automáticamente. Para incluir tablas nuevas (por ejemplo `actuator_commands`), aplica el script manualmente o recrea el volumen `mariadb_data`.
 
 ## 4) Configurar firmware ESP32
 
@@ -64,6 +70,9 @@ Luego compilar/subir con PlatformIO y abrir monitor serie.
   - `sensor_readings`
   - `state_events`
   - `alerts` (solo cuando CO >= 22)
+  - `actuator_commands` (cuando se emiten comandos)
+
+También puedes ejecutar los inject de consulta histórica en Node-RED para obtener resúmenes rápidos de `sensor_readings`, `state_events`, `alerts` y `actuator_commands`.
 
 ## 6) Consideraciones de seguridad mínima
 

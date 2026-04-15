@@ -49,6 +49,8 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change_me_fiot_app}
       HARDWARE_DEVICE_ID: ${HARDWARE_DEVICE_ID:-ESP32-GARAGE-CO-001}
       SIM_DEVICE_ID: ${SIM_DEVICE_ID:-SIM-GARAGE-CO-001}
+      MQTT_COMMAND_TOPIC: ${MQTT_COMMAND_TOPIC:-your_maqiatto_username/fiot/garage/commands}
+      COMMANDS_ENABLED: ${COMMANDS_ENABLED:-true}
       NR_AUTO_IMPORT: ${NR_AUTO_IMPORT:-true}
       NR_FORCE_IMPORT: ${NR_FORCE_IMPORT:-false}
     ports:

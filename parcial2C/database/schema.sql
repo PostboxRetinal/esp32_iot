@@ -68,6 +68,26 @@
     INDEX idx_alert_status (ack_status)
   ) ENGINE=InnoDB;
 
+  CREATE TABLE IF NOT EXISTS actuator_commands (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    device_id VARCHAR(64) NOT NULL,
+    device_timestamp VARCHAR(40) NOT NULL,
+    command_ts TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    actuator VARCHAR(40) NOT NULL,
+    action VARCHAR(24) NOT NULL,
+    reason VARCHAR(255) DEFAULT NULL,
+    source_state VARCHAR(24) DEFAULT NULL,
+    co_ppm DECIMAL(6,2) DEFAULT NULL,
+    presencia TINYINT(1) DEFAULT NULL,
+    status ENUM('PUBLISHED', 'SKIPPED', 'ERROR') NOT NULL DEFAULT 'PUBLISHED',
+    CONSTRAINT fk_command_device FOREIGN KEY (device_id)
+      REFERENCES devices(device_id)
+      ON UPDATE CASCADE
+      ON DELETE RESTRICT,
+    INDEX idx_command_device_time (device_id, command_ts),
+    INDEX idx_command_actuator_status (actuator, status)
+  ) ENGINE=InnoDB;
+
   INSERT INTO devices (device_id, node_type, description)
   VALUES
     ('ESP32-GARAGE-CO-001', 'hardware', 'Wemos D1 R32 ESP32 hardware node'),
