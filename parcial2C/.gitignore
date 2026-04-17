@@ -2,16 +2,5 @@
 .vscode
 *.pdf
 
-# nodeRED related files to ignore
-nodered/node_modules
-nodered/.npm
-nodered/lib
-nodered/.config.nodes.json
-nodered/.config.runtime.json
-nodered/.config.nodes.json.backup
-nodered/.config.runtime.json.backup
-nodered/.pnpm-store
-nodered/flows_cred.json
-
 # Ignore environment files with sensitive information
 infrastructure/.env
