@@ -1,0 +1,25 @@
+services:
+  mqtt-simulator:
+    build:
+      context: ./simulator
+      dockerfile: Dockerfile
+    image: esp32-iot-mqtt-simulator:latest
+    container_name: esp32-iot-mqtt-simulator
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - MQTT_SERVER=${MQTT_SERVER}
+      - MQTT_PORT=${MQTT_PORT}
+      - MQTT_USER=${MQTT_USER}
+      - MQTT_PASS=${MQTT_PASS}
+      - TOPICO_DATOS=${TOPICO_DATOS}
+      - TOPICO_COMANDOS=${TOPICO_COMANDOS}
+      - SIM_DEVICE_ID=${SIM_DEVICE_ID:-SIM-NODO-01}
+      - SIM_HABITACION=${SIM_HABITACION:-HTL-N-P1-201}
+      - SIM_CONTEXTO_HOTEL=${SIM_CONTEXTO_HOTEL:-LIBRE}
+      - SIM_SISTEMA_ACTIVO=${SIM_SISTEMA_ACTIVO:-true}
+      - SIM_INTERVAL_SECONDS=${SIM_INTERVAL_SECONDS:-7}
+      - SIM_MOTION_PROB=${SIM_MOTION_PROB:-0.3}
+      - SIM_DHT_FAIL_PROB=${SIM_DHT_FAIL_PROB:-0.05}
+      - SIM_ALERT_PROB=${SIM_ALERT_PROB:-0.22}

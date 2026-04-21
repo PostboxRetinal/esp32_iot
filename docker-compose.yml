@@ -15,7 +15,7 @@ services:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./init-db.sql:/docker-entrypoint-initdb.d/01-init-db.sql:ro,Z
+      - ./docker/mysql/init-db.sql:/docker-entrypoint-initdb.d/01-init-db.sql:ro,Z
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 10s
@@ -44,14 +44,14 @@ services:
       - FLOWS=flows.json
       - MQTT_SERVER=${MQTT_SERVER}
       - MQTT_PORT=${MQTT_PORT}
-      - MQTT_BROKER_URL=${MQTT_BROKER_URL}
       - MQTT_USER=${MQTT_USER}
       - MQTT_PASS=${MQTT_PASS}
       - TOPICO_DATOS=${TOPICO_DATOS}
       - TOPICO_COMANDOS=${TOPICO_COMANDOS}
       - CMD_COOLDOWN_MS=${CMD_COOLDOWN_MS}
-      - UMBRAL_MQ135_PELIGRO=${UMBRAL_MQ135_PELIGRO}
-      - UMBRAL_MQ7_PELIGRO=${UMBRAL_MQ7_PELIGRO}
+      - SAMPLE_MS_NORMAL=${SAMPLE_MS_NORMAL}
+      - SAMPLE_MS_ALERTA=${SAMPLE_MS_ALERTA}
+      - SAMPLE_MS_EMERGENCIA=${SAMPLE_MS_EMERGENCIA}
       - UMBRAL_TEMP_INCENDIO=${UMBRAL_TEMP_INCENDIO}
       - PH3_PEL_PPM=${PH3_PEL_PPM}
       - PH3_STEL_PPM=${PH3_STEL_PPM}
@@ -76,12 +76,15 @@ services:
       - MYSQL_USER=${MYSQL_USER}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD}
       - MYSQL_DATABASE=${MYSQL_DATABASE:-ciudad_inteligente}
+      - MQTT_CONFIG_NODE_ID=${MQTT_CONFIG_NODE_ID:-a1b2c3d4e5f60111}
+      - MYSQL_CONFIG_NODE_ID=${MYSQL_CONFIG_NODE_ID:-d9f3d61e3a4c0aaa}
+      - SYNC_FLOWS_FROM_SEED=${SYNC_FLOWS_FROM_SEED:-true}
+      - SYNC_SETTINGS_FROM_SEED=${SYNC_SETTINGS_FROM_SEED:-true}
       - NODE_RED_CREDENTIAL_SECRET=${NODE_RED_CREDENTIAL_SECRET:-ciudad-inteligente-secret-2024}
     volumes:
       - nodered_data:/data
-      - ./flows.json:/data/flows.json:Z
-      - ./settings.js:/data/settings.js:Z
-      - ./flows_cred.json:/data/flows_cred.json:Z
+      - ./flows.json:/seed/flows.json:ro,Z
+      - ./settings.js:/seed/settings.js:ro,Z
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:1880 || exit 1"]
       interval: 20s

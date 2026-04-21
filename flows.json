@@ -1,628 +1,708 @@
 [
-    {
-        "id": "b7d6c0b9c8cf00d5",
-        "type": "tab",
-        "label": "HTL-N-P1-103",
-        "disabled": false,
-        "info": "",
-        "env": []
-    },
-    {
-        "id": "f9b8f9ba238c2d7e",
-        "type": "mqtt in",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "alertas",
-        "topic": "${TOPICO_DATOS}",
-        "qos": "1",
-        "datatype": "utf8",
-        "broker": "a1b2c3d4e5f60111",
-        "nl": false,
-        "rap": true,
-        "rh": 0,
-        "inputs": 0,
-        "x": 170,
-        "y": 160,
-        "wires": [
-            [
-                "c662ce57ec9b1ac2"
-            ]
-        ]
-    },
-    {
-        "id": "c662ce57ec9b1ac2",
-        "type": "json",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "parse json alertas",
-        "property": "payload",
-        "action": "obj",
-        "pretty": false,
-        "x": 360,
-        "y": 160,
-        "wires": [
-            [
-                "168c88cfda65fff7"
-            ]
-        ]
-    },
-    {
-        "id": "168c88cfda65fff7",
-        "type": "function",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "validar + normalizar payload",
-        "func": "const p = msg.payload;\n\nif (typeof p !== 'object' || p === null || Array.isArray(p)) {\n    msg.error = 'payload no es un objeto JSON válido';\n    return [null, msg];\n}\n\nconst src = {\n    room: p.room ?? p.habitacion,\n    roomContext: p.contexto_hotel ?? p.room_context,\n    timestamp: p.timestamp ?? p.timestamp_ms,\n    temperature_C: p.temperature_C ?? p.temperatura_C,\n    humidity_pct: p.humidity_pct ?? p.humedad_pct,\n    mq135: p.mq135 ?? p.fosfina_mq135,\n    mq7: p.mq7 ?? p.co_mq7,\n    motion: p.motion ?? p.presencia_pir\n};\n\nconst rawTimestamp = src.timestamp ?? new Date().toISOString();\nlet normalizedTimestamp = '';\n\nif (typeof rawTimestamp === 'number' && Number.isFinite(rawTimestamp)) {\n    const ts = rawTimestamp < 1e12 ? rawTimestamp * 1000 : rawTimestamp;\n    normalizedTimestamp = new Date(ts).toISOString();\n} else if (typeof rawTimestamp === 'string') {\n    // Soporta ISO y epoch en string (segundos o milisegundos)\n    if (/^\\d+$/.test(rawTimestamp.trim())) {\n        const epoch = Number(rawTimestamp);\n        if (Number.isFinite(epoch)) {\n            const ts = epoch < 1e12 ? epoch * 1000 : epoch;\n            normalizedTimestamp = new Date(ts).toISOString();\n        }\n    } else {\n        const isoParsed = Date.parse(rawTimestamp);\n        if (Number.isFinite(isoParsed)) {\n            normalizedTimestamp = new Date(isoParsed).toISOString();\n        }\n    }\n}\n\nconst motionRaw = src.motion;\nlet motion = false;\nif (typeof motionRaw === 'boolean') {\n    motion = motionRaw;\n} else if (typeof motionRaw === 'string') {\n    const v = motionRaw.trim().toLowerCase();\n    motion = v === '1' || v === 'true' || v === 'on' || v === 'si' || v === 'sí';\n} else {\n    motion = Number(motionRaw) > 0;\n}\n\nconst out = {\n    room: String(src.room ?? ''),\n    room_context: String(src.roomContext ?? ''),\n    timestamp: normalizedTimestamp,\n    temperature_C: Number(src.temperature_C),\n    humidity_pct: Number(src.humidity_pct),\n    mq135: Number(src.mq135),\n    mq7: Number(src.mq7),\n    motion\n};\n\nconst errors = [];\nif (!out.room) errors.push('room requerido');\nif (!out.timestamp) errors.push('timestamp inválido');\nif (!Number.isFinite(out.temperature_C)) errors.push('temperature_C inválido');\nif (!Number.isFinite(out.humidity_pct)) errors.push('humidity_pct inválido');\nif (!Number.isFinite(out.mq135)) errors.push('mq135 inválido');\nif (!Number.isFinite(out.mq7)) errors.push('mq7 inválido');\n\nif (errors.length > 0) {\n    msg.error = errors.join('; ');\n    msg.validation_errors = errors;\n    return [null, msg];\n}\n\nmsg.payload = out;\nreturn [msg, null];",
-        "outputs": 2,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 620,
-        "y": 160,
-        "wires": [
-            [
-                "0d9627be4652cda1"
-            ],
-            [
-                "0b9326811c83e391"
-            ]
-        ]
-    },
-    {
-        "id": "0d9627be4652cda1",
-        "type": "function",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "risk-engine backend",
-        "func": "const p = msg.payload;\n\nconst contextFromPayload = String(p?.room_context ?? p?.contexto_hotel ?? '').toUpperCase();\nconst validContexts = ['LIBRE', 'RESERVADA', 'FUMIGACION'];\nlet contexto = flow.get('estado_habitacion') || 'LIBRE';\n\nif (validContexts.includes(contextFromPayload) && contextFromPayload !== contexto) {\n    contexto = contextFromPayload;\n    flow.set('estado_habitacion', contexto);\n}\n\n// ================================\n// RANGOS DEL PDF (ppm)\n// ================================\n// PH3 (Fosfina): PEL 0.3, STEL 1.0, irritación 5-10, IDLH 50, letal 400-600\nconst PH3_PEL = Number(env.get('PH3_PEL_PPM') || 0.3);\nconst PH3_STEL = Number(env.get('PH3_STEL_PPM') || 1.0);\nconst PH3_IRRIT_LOW = Number(env.get('PH3_IRRIT_LOW_PPM') || 5);\nconst PH3_IRRIT_HIGH = Number(env.get('PH3_IRRIT_HIGH_PPM') || 10);\nconst PH3_IDLH = Number(env.get('PH3_IDLH_PPM') || 50);\nconst PH3_LETHAL_LOW = Number(env.get('PH3_LETHAL_LOW_PPM') || 400);\n\n// CO: PEL 50, dolor leve 200, STEL 400, severo 800, IDLH 1500\nconst CO_PEL = Number(env.get('CO_PEL_PPM') || 50);\nconst CO_HEADACHE = Number(env.get('CO_HEADACHE_PPM') || 200);\nconst CO_STEL = Number(env.get('CO_STEL_PPM') || 400);\nconst CO_SEVERE = Number(env.get('CO_SEVERE_PPM') || 800);\nconst CO_IDLH = Number(env.get('CO_IDLH_PPM') || 1500);\n\n// Temperatura de proceso\nconst TEMP_ALERTA = Number(env.get('TEMP_ALERTA_C') || 35);\nconst TEMP_INCENDIO = Number(env.get('UMBRAL_TEMP_INCENDIO') || 45);\n\n// ================================\n// CALIBRACIÓN RAW -> ppm (fallback)\n// ================================\n// Si no llega ppm explícito, se estima con escala lineal configurable.\nconst MQ135_MIN = Number(env.get('MQ135_RAW_MIN') || 0);\nconst MQ135_MAX = Number(env.get('MQ135_RAW_MAX') || 4095);\nconst MQ7_MIN = Number(env.get('MQ7_RAW_MIN') || 0);\nconst MQ7_MAX = Number(env.get('MQ7_RAW_MAX') || 4095);\n\nconst MQ135_PPM_MAX = Number(env.get('PH3_PPM_MAX_EST') || 120);\nconst MQ7_PPM_MAX = Number(env.get('CO_PPM_MAX_EST') || 2000);\n\nfunction clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }\nfunction mapRawToPpm(raw, inMin, inMax, outMax) {\n    const x = clamp(Number(raw), inMin, inMax);\n    const ratio = (x - inMin) / Math.max(1, (inMax - inMin));\n    return ratio * outMax;\n}\n\nconst ph3Ppm = Number.isFinite(Number(p.ph3_ppm))\n    ? Number(p.ph3_ppm)\n    : mapRawToPpm(p.mq135, MQ135_MIN, MQ135_MAX, MQ135_PPM_MAX);\n\nconst coPpm = Number.isFinite(Number(p.co_ppm))\n    ? Number(p.co_ppm)\n    : mapRawToPpm(p.mq7, MQ7_MIN, MQ7_MAX, MQ7_PPM_MAX);\n\nlet estado = 'NORMAL';\nlet razon = 'sin_alertas';\nlet nivel_alerta_detalle = 'NORMAL';\nlet color_alerta = 'green';\n\nif (contexto === 'FUMIGACION') {\n    if (p.motion) {\n        estado = 'EMERGENCIA';\n        razon = 'intruso_en_fumigacion';\n        nivel_alerta_detalle = 'CRITICO: INTRUSO EN FUMIGACION';\n        color_alerta = 'red';\n    } else if (ph3Ppm >= PH3_IDLH || coPpm >= CO_IDLH || p.temperature_C >= TEMP_INCENDIO) {\n        estado = 'EMERGENCIA';\n        razon = 'riesgo_letal_en_fumigacion';\n        nivel_alerta_detalle = 'CRITICO: RIESGO LETAL EN FUMIGACION';\n        color_alerta = 'red';\n    } else if (ph3Ppm >= PH3_PEL || coPpm >= CO_PEL || p.temperature_C >= TEMP_ALERTA) {\n        estado = 'ALERTA';\n        razon = 'operacion_fumigacion_vigilada';\n        nivel_alerta_detalle = 'ALERTA: FUMIGACION ACTIVA BAJO VIGILANCIA';\n        color_alerta = 'yellow';\n    }\n} else {\n    if (ph3Ppm >= PH3_LETHAL_LOW || coPpm >= CO_IDLH || p.temperature_C >= TEMP_INCENDIO) {\n        estado = 'EMERGENCIA';\n        razon = 'riesgo_critico_ambiental';\n        if (ph3Ppm >= PH3_LETHAL_LOW) nivel_alerta_detalle = 'CRITICO: FOSFINA NIVEL LETAL';\n        else if (coPpm >= CO_IDLH) nivel_alerta_detalle = 'CRITICO: CO IDLH';\n        else nivel_alerta_detalle = 'CRITICO: CONATO DE INCENDIO';\n        color_alerta = 'red';\n    } else if (ph3Ppm >= PH3_IDLH || coPpm >= CO_SEVERE || p.temperature_C >= TEMP_ALERTA) {\n        estado = 'ALERTA';\n        razon = 'riesgo_alto';\n        if (ph3Ppm >= PH3_IDLH) nivel_alerta_detalle = 'ALERTA: FOSFINA SOBRE IDLH';\n        else if (coPpm >= CO_SEVERE) nivel_alerta_detalle = 'ALERTA: CO NIVEL SEVERO';\n        else nivel_alerta_detalle = 'ALERTA: TEMPERATURA ELEVADA';\n        color_alerta = 'yellow';\n    } else if (ph3Ppm >= PH3_IRRIT_LOW || coPpm >= CO_STEL) {\n        estado = 'ALERTA';\n        razon = 'riesgo_moderado';\n        if (ph3Ppm >= PH3_IRRIT_LOW && ph3Ppm <= PH3_IRRIT_HIGH) nivel_alerta_detalle = 'ALERTA: IRRITACION POR FOSFINA';\n        else if (coPpm >= CO_STEL) nivel_alerta_detalle = 'ALERTA: CO SOBRE STEL';\n        color_alerta = 'yellow';\n    } else if (ph3Ppm >= PH3_STEL || coPpm >= CO_HEADACHE) {\n        estado = 'ALERTA';\n        razon = 'riesgo_inicial';\n        if (ph3Ppm >= PH3_STEL) nivel_alerta_detalle = 'ALERTA: FOSFINA SOBRE STEL';\n        else nivel_alerta_detalle = 'ALERTA: CO POSIBLE CEFALEA';\n        color_alerta = 'yellow';\n    } else if (ph3Ppm >= PH3_PEL || coPpm >= CO_PEL) {\n        estado = 'ALERTA';\n        razon = 'sobre_pel';\n        nivel_alerta_detalle = 'ALERTA: SOBRE LIMITE PERMISIBLE (PEL)';\n        color_alerta = 'yellow';\n    }\n}\n\nconst statusText = `${estado} | ${nivel_alerta_detalle}`.slice(0, 64);\nif (estado === 'EMERGENCIA') {\n    node.status({ fill: 'red', shape: 'dot', text: statusText });\n} else if (estado === 'ALERTA') {\n    node.status({ fill: 'yellow', shape: 'dot', text: statusText });\n} else {\n    node.status({ fill: 'green', shape: 'dot', text: statusText });\n}\n\nmsg.payload = {\n    ...p,\n    contexto_hotel: contexto,\n    estado_riesgo: estado,\n    razon_riesgo: razon,\n    nivel_alerta: nivel_alerta_detalle,\n    color_alerta,\n    ph3_ppm: Number(ph3Ppm.toFixed(2)),\n    co_ppm: Number(coPpm.toFixed(2)),\n    backend_ts: Date.now()\n};\n\nreturn msg;",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 880,
-        "y": 140,
-        "wires": [
-            [
-                "2288e4f69a485380",
-                "f18a9f5d2f95e111"
-            ]
-        ]
-    },
-    {
-        "id": "f18a9f5d2f95e111",
-        "type": "function",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "map payload -> INSERT sensores",
-        "func": "const p = msg.payload || {};\n\nconst habitacion = String(p.habitacion ?? p.room ?? '');\nconst contextoHotel = String(p.contexto_hotel ?? p.room_context ?? '');\nconst sistemaActivo = (typeof p.sistema_activo === 'boolean') ? p.sistema_activo : null;\nconst intervaloEnvio = Number.isFinite(Number(p.intervalo_envio_ms)) ? Number(p.intervalo_envio_ms) : null;\nconst fosfinaMq135 = Number.isFinite(Number(p.fosfina_mq135 ?? p.mq135)) ? Number(p.fosfina_mq135 ?? p.mq135) : null;\nconst coMq7 = Number.isFinite(Number(p.co_mq7 ?? p.mq7)) ? Number(p.co_mq7 ?? p.mq7) : null;\nconst presenciaPir = (p.presencia_pir ?? p.motion);\nconst presenciaInt = presenciaPir === null || presenciaPir === undefined ? null : ((presenciaPir === true || Number(presenciaPir) > 0) ? 1 : 0);\nconst eventoPir = p.evento_pir ?? null;\nconst temperaturaC = Number.isFinite(Number(p.temperatura_C ?? p.temperature_C)) ? Number(p.temperatura_C ?? p.temperature_C) : null;\nconst humedadPct = Number.isFinite(Number(p.humedad_pct ?? p.humidity_pct)) ? Number(p.humedad_pct ?? p.humidity_pct) : null;\nconst dhtOk = (typeof p.dht_ok === 'boolean') ? p.dht_ok : null;\nconst errorMsg = p.error ?? null;\nconst estadoRiesgo = p.estado_riesgo ?? null;\nconst razonRiesgo = p.razon_riesgo ?? null;\nconst nivelAlerta = p.nivel_alerta ?? null;\nconst colorAlerta = p.color_alerta ?? null;\nconst ph3Ppm = Number.isFinite(Number(p.ph3_ppm)) ? Number(p.ph3_ppm) : null;\nconst coPpm = Number.isFinite(Number(p.co_ppm)) ? Number(p.co_ppm) : null;\nconst backendTs = Number.isFinite(Number(p.backend_ts)) ? Number(p.backend_ts) : null;\n\nif (!habitacion) {\n    node.warn('INSERT omitido: habitacion vacía');\n    return null;\n}\n\nmsg.topic = 'INSERT INTO sensores (habitacion, timestamp, recibido_en, contexto_hotel, sistema_activo, intervalo_envio_ms, fosfina_mq135, co_mq7, presencia_pir, evento_pir, temperatura_C, humedad_pct, dht_ok, error, estado_riesgo, razon_riesgo, nivel_alerta, color_alerta, ph3_ppm, co_ppm, backend_ts) VALUES (?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);';\n\nmsg.payload = [\n    habitacion,\n    contextoHotel,\n    sistemaActivo,\n    intervaloEnvio,\n    fosfinaMq135,\n    coMq7,\n    presenciaInt,\n    eventoPir,\n    temperaturaC,\n    humedadPct,\n    dhtOk,\n    errorMsg,\n    estadoRiesgo,\n    razonRiesgo,\n    nivelAlerta,\n    colorAlerta,\n    ph3Ppm,\n    coPpm,\n    backendTs\n];\n\nreturn msg;",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 1160,
-        "y": 60,
-        "wires": [
-            [
-                "3ab5f08d6d88d222"
-            ]
-        ]
-    },
-    {
-        "id": "3ab5f08d6d88d222",
-        "type": "mysql",
-        "z": "b7d6c0b9c8cf00d5",
-        "mydb": "d9f3d61e3a4c0aaa",
-        "name": "mysql insert sensores",
-        "x": 1410,
-        "y": 60,
-        "wires": [
-            [
-                "9a0fb388c4d76333"
-            ]
-        ]
-    },
-    {
-        "id": "9a0fb388c4d76333",
-        "type": "debug",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "debug mysql insert ok",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": false,
-        "complete": "payload",
-        "targetType": "msg",
-        "statusVal": "",
-        "statusType": "auto",
-        "x": 1630,
-        "y": 60,
-        "wires": []
-    },
-    {
-        "id": "85e8a55e7c24d444",
-        "type": "inject",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "SELECT * sensores",
-        "props": [
-            {
-                "p": "payload"
-            }
-        ],
-        "repeat": "",
-        "crontab": "",
-        "once": false,
-        "onceDelay": 0.1,
-        "topic": "",
-        "payload": "",
-        "payloadType": "date",
-        "x": 190,
-        "y": 660,
-        "wires": [
-            [
-                "62777d2cb261c555"
-            ]
-        ]
-    },
-    {
-        "id": "62777d2cb261c555",
-        "type": "function",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "query SELECT sensores",
-        "func": "msg.topic = 'SELECT * FROM sensores ORDER BY id DESC LIMIT 100;';\nmsg.payload = [];\nreturn msg;",
-        "outputs": 1,
-        "timeout": "",
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 430,
-        "y": 660,
-        "wires": [
-            [
-                "0c2ce29618ecf666"
-            ]
-        ]
-    },
-    {
-        "id": "0c2ce29618ecf666",
-        "type": "mysql",
-        "z": "b7d6c0b9c8cf00d5",
-        "mydb": "d9f3d61e3a4c0aaa",
-        "name": "mysql select sensores",
-        "x": 660,
-        "y": 660,
-        "wires": [
-            [
-                "57c216551fe8a777"
-            ]
-        ]
-    },
-    {
-        "id": "57c216551fe8a777",
-        "type": "debug",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "debug SELECT sensores",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": false,
-        "complete": "payload",
-        "targetType": "msg",
-        "statusVal": "",
-        "statusType": "auto",
-        "x": 900,
-        "y": 660,
-        "wires": []
-    },
-    {
-        "id": "0d4e8ef9fd6c3888",
-        "type": "catch",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "catch errores mysql",
-        "scope": [
-            "3ab5f08d6d88d222",
-            "0c2ce29618ecf666"
-        ],
-        "uncaught": false,
-        "x": 210,
-        "y": 720,
-        "wires": [
-            [
-                "4499a8f335f0f999"
-            ]
-        ]
-    },
-    {
-        "id": "4499a8f335f0f999",
-        "type": "debug",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "debug errores mysql",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": true,
-        "complete": "true",
-        "targetType": "full",
-        "statusVal": "error.message",
-        "statusType": "msg",
-        "x": 450,
-        "y": 720,
-        "wires": []
-    },
-    {
-        "id": "2288e4f69a485380",
-        "type": "switch",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "ESTADOS",
-        "property": "payload.estado_riesgo",
-        "propertyType": "msg",
-        "rules": [
-            {
-                "t": "eq",
-                "v": "NORMAL",
-                "vt": "str"
-            },
-            {
-                "t": "eq",
-                "v": "ALERTA",
-                "vt": "str"
-            },
-            {
-                "t": "eq",
-                "v": "EMERGENCIA",
-                "vt": "str"
-            },
-            {
-                "t": "else"
-            }
-        ],
-        "checkall": "true",
-        "repair": false,
-        "outputs": 4,
-        "x": 1090,
-        "y": 180,
-        "wires": [
-            [
-                "f3051d0a930d0937",
-                "2e03c35144a59e1e"
-            ],
-            [
-                "0f1953d279663222"
-            ],
-            [
-                "d1a88de4b3256373",
-                "2e03c35144a59e1e"
-            ],
-            [
-                "4aebca3950c2d155"
-            ]
-        ]
-    },
-    {
-        "id": "2e03c35144a59e1e",
-        "type": "function",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "politica comandos",
-        "func": "const risk = msg?.payload?.estado_riesgo;\nif (!risk) return null;\n\nconst intervalByRisk = {\n    NORMAL: Number(env.get('SAMPLE_MS_NORMAL') || 15000),\n    ALERTA: Number(env.get('SAMPLE_MS_ALERTA') || 7000),\n    EMERGENCIA: Number(env.get('SAMPLE_MS_EMERGENCIA') || 3000)\n};\n\nconst intervalMs = Number(intervalByRisk[risk]);\nif (!Number.isFinite(intervalMs) || intervalMs <= 0) return null;\n\nconst contexto = flow.get('estado_habitacion') || 'LIBRE';\nconst cmd = 'INICIAR';\n\nconst cooldownMs = Number(env.get('CMD_COOLDOWN_MS') || 15000);\nconst now = Date.now();\nconst lastAt = Number(flow.get('last_cmd_at') || 0);\nconst lastSig = flow.get('last_cmd_sig') || '';\nconst sig = `${cmd}|${contexto}|${intervalMs}`;\n\nif ((now - lastAt) < cooldownMs && lastSig === sig) {\n    return null;\n}\n\nflow.set('last_cmd_at', now);\nflow.set('last_cmd_sig', sig);\n\nmsg.topic = env.get('TOPICO_COMANDOS') || 'alejandro.bravo_isa@uao.edu.co/comandos';\nmsg.payload = {\n    msg: cmd,\n    estado: contexto,\n    sample_interval_ms: intervalMs\n};\nreturn msg;",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 1310,
-        "y": 300,
-        "wires": [
-            [
-                "80fc9f72dc148d75",
-                "5b960acf29f7316e"
-            ]
-        ]
-    },
-    {
-        "id": "f3051d0a930d0937",
-        "type": "debug",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "debug NORMAL",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": true,
-        "complete": "payload",
-        "targetType": "msg",
-        "statusVal": "payload.nivel_alerta",
-        "statusType": "msg",
-        "x": 1360,
-        "y": 100,
-        "wires": []
-    },
-    {
-        "id": "0f1953d279663222",
-        "type": "debug",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "debug ALERTA",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": true,
-        "complete": "payload",
-        "targetType": "msg",
-        "statusVal": "payload.nivel_alerta",
-        "statusType": "msg",
-        "x": 1360,
-        "y": 140,
-        "wires": []
-    },
-    {
-        "id": "d1a88de4b3256373",
-        "type": "debug",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "debug EMERGENCIA",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": true,
-        "complete": "payload",
-        "targetType": "msg",
-        "statusVal": "payload.nivel_alerta",
-        "statusType": "msg",
-        "x": 1380,
-        "y": 180,
-        "wires": []
-    },
-    {
-        "id": "4aebca3950c2d155",
-        "type": "debug",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "debug OTROS/INVALIDO",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": true,
-        "complete": "true",
-        "targetType": "full",
-        "statusVal": "error",
-        "statusType": "msg",
-        "x": 1390,
-        "y": 220,
-        "wires": []
-    },
-    {
-        "id": "0b9326811c83e391",
-        "type": "debug",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "debug payload invalido",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": false,
-        "complete": "true",
-        "targetType": "full",
-        "x": 900,
-        "y": 260,
-        "wires": []
-    },
-    {
-        "id": "5b960acf29f7316e",
-        "type": "debug",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "debug comando emitido",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": false,
-        "complete": "payload",
-        "targetType": "msg",
-        "statusVal": "",
-        "statusType": "auto",
-        "x": 1550,
-        "y": 300,
-        "wires": []
-    },
-    {
-        "id": "647c0f0fa0ebef21",
-        "type": "catch",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "catch errores flujo",
-        "scope": null,
-        "uncaught": false,
-        "x": 190,
-        "y": 420,
-        "wires": [
-            [
-                "4a8baa3d461f0c8b"
-            ]
-        ]
-    },
-    {
-        "id": "4a8baa3d461f0c8b",
-        "type": "debug",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "debug errores flujo",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": true,
-        "complete": "true",
-        "targetType": "full",
-        "statusVal": "error.message",
-        "statusType": "msg",
-        "x": 410,
-        "y": 420,
-        "wires": []
-    },
-    {
-        "id": "5f140744d347019a",
-        "type": "inject",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "Contexto LIBRE",
-        "props": [
-            {
-                "p": "payload"
-            },
-            {
-                "p": "topic",
-                "vt": "str"
-            }
-        ],
-        "repeat": "",
-        "crontab": "",
-        "once": false,
-        "onceDelay": 0.1,
-        "topic": "${TOPICO_COMANDOS}",
-        "payload": "{\"estado\":\"LIBRE\"}",
-        "payloadType": "json",
-        "x": 220,
-        "y": 500,
-        "wires": [
-            [
-                "5798f954f5e9c111"
-            ]
-        ]
-    },
-    {
-        "id": "06534d6bf41c8a53",
-        "type": "inject",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "Contexto RESERVADA",
-        "props": [
-            {
-                "p": "payload"
-            },
-            {
-                "p": "topic",
-                "vt": "str"
-            }
-        ],
-        "repeat": "",
-        "crontab": "",
-        "once": false,
-        "onceDelay": 0.1,
-        "topic": "${TOPICO_COMANDOS}",
-        "payload": "{\"estado\":\"RESERVADA\"}",
-        "payloadType": "json",
-        "x": 240,
-        "y": 540,
-        "wires": [
-            [
-                "5798f954f5e9c111"
-            ]
-        ]
-    },
-    {
-        "id": "0c6e95a9f1a5ef0e",
-        "type": "inject",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "Contexto FUMIGACION",
-        "props": [
-            {
-                "p": "payload"
-            },
-            {
-                "p": "topic",
-                "vt": "str"
-            }
-        ],
-        "repeat": "",
-        "crontab": "",
-        "once": false,
-        "onceDelay": 0.1,
-        "topic": "${TOPICO_COMANDOS}",
-        "payload": "{\"estado\":\"FUMIGACION\"}",
-        "payloadType": "json",
-        "x": 250,
-        "y": 580,
-        "wires": [
-            [
-                "5798f954f5e9c111"
-            ]
-        ]
-    },
-    {
-        "id": "5798f954f5e9c111",
-        "type": "function",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "set contexto backend + forward",
-        "func": "const estado = msg?.payload?.estado;\nconst validos = ['LIBRE', 'RESERVADA', 'FUMIGACION'];\nif (!validos.includes(estado)) {\n    node.warn('estado invalido: ' + estado);\n    return null;\n}\nflow.set('estado_habitacion', estado);\nmsg.topic = env.get('TOPICO_COMANDOS') || 'alejandro.bravo_isa@uao.edu.co/comandos';\nreturn msg;",
-        "outputs": 1,
-        "timeout": "",
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 520,
-        "y": 540,
-        "wires": [
-            [
-                "80fc9f72dc148d75",
-                "5b960acf29f7316e"
-            ]
-        ]
-    },
-    {
-        "id": "80fc9f72dc148d75",
-        "type": "mqtt out",
-        "z": "b7d6c0b9c8cf00d5",
-        "name": "comandos",
-        "topic": "${TOPICO_COMANDOS}",
-        "qos": "1",
-        "retain": "false",
-        "respTopic": "",
-        "contentType": "",
-        "userProps": "",
-        "correl": "",
-        "expiry": "",
-        "broker": "a1b2c3d4e5f60111",
-        "x": 430,
-        "y": 300,
-        "wires": []
-    },
-    {
-        "id": "a1b2c3d4e5f60111",
-        "type": "mqtt-broker",
-        "name": "Maqiatto Broker",
-        "broker": "maqiatto.com",
-        "port": "1883",
-        "clientid": "",
-        "autoConnect": true,
-        "usetls": false,
-        "protocolVersion": "4",
-        "keepalive": "60",
-        "cleansession": true,
-        "autoUnsubscribe": true,
-        "birthTopic": "",
-        "birthQos": "0",
-        "birthRetain": "false",
-        "birthPayload": "",
-        "birthMsg": {},
-        "closeTopic": "",
-        "closeQos": "0",
-        "closeRetain": "false",
-        "closePayload": "",
-        "closeMsg": {},
-        "willTopic": "",
-        "willQos": "0",
-        "willRetain": "false",
-        "willPayload": "",
-        "willMsg": {},
-        "userProps": "",
-        "sessionExpiry": "",
-        "user": "alejandro.bravo_isa@uao.edu.co",
-        "password": "maqiatto123"
-    },
-    {
-        "id": "d9f3d61e3a4c0aaa",
-        "type": "MySQLdatabase",
-        "name": "MySQL ciudad_inteligente",
-        "host": "mysql",
-        "port": "3306",
-        "db": "ciudad_inteligente",
-        "tz": "",
-        "charset": "UTF8",
-        "credentials": {
-            "user": "nodered_user",
-            "password": "nodered_password_change_me"
-        }
+  {
+    "id": "b7d6c0b9c8cf00d5",
+    "type": "tab",
+    "label": "HTL-IOT-PROCESAMIENTO",
+    "disabled": false,
+    "info": "",
+    "env": []
+  },
+  {
+    "id": "f9b8f9ba238c2d7e",
+    "type": "mqtt in",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "mqtt in datos",
+    "topic": "${TOPICO_DATOS}",
+    "qos": "1",
+    "datatype": "utf8",
+    "broker": "a1b2c3d4e5f60111",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 140,
+    "y": 120,
+    "wires": [["c662ce57ec9b1ac2"]]
+  },
+  {
+    "id": "c662ce57ec9b1ac2",
+    "type": "json",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "parse json datos",
+    "property": "payload",
+    "action": "obj",
+    "pretty": false,
+    "x": 320,
+    "y": 120,
+    "wires": [["168c88cfda65fff7"]]
+  },
+  {
+    "id": "168c88cfda65fff7",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "validar + normalizar payload",
+    "func": "const p = msg.payload;\n\nif (typeof p !== 'object' || p === null || Array.isArray(p)) {\n    msg.error = 'payload no es un objeto JSON valido';\n    return [null, msg];\n}\n\nfunction toNumberOrNull(v) {\n    if (v === null || v === undefined || v === '') return null;\n    const n = Number(v);\n    return Number.isFinite(n) ? n : null;\n}\n\nfunction toBoolean(v, fallback = false) {\n    if (typeof v === 'boolean') return v;\n    if (typeof v === 'number') return v > 0;\n    if (typeof v === 'string') {\n        const x = v.trim().toLowerCase();\n        return x === '1' || x === 'true' || x === 'on' || x === 'si' || x === 'yes';\n    }\n    return fallback;\n}\n\nfunction normalizeTimestamp(raw) {\n    if (raw === null || raw === undefined || raw === '') return null;\n\n    if (typeof raw === 'number' && Number.isFinite(raw)) {\n        const epoch = raw < 1e12 ? raw * 1000 : raw;\n        const dt = new Date(epoch);\n        return Number.isFinite(dt.getTime()) ? dt.toISOString() : null;\n    }\n\n    if (typeof raw === 'string') {\n        const value = raw.trim();\n        if (!value) return null;\n\n        if (/^\\d+$/.test(value)) {\n            const epoch = Number(value);\n            if (Number.isFinite(epoch)) {\n                const ms = epoch < 1e12 ? epoch * 1000 : epoch;\n                const dtEpoch = new Date(ms);\n                return Number.isFinite(dtEpoch.getTime()) ? dtEpoch.toISOString() : null;\n            }\n        }\n\n        const parsed = Date.parse(value);\n        if (Number.isFinite(parsed)) {\n            return new Date(parsed).toISOString();\n        }\n    }\n\n    return null;\n}\n\nconst deviceId = String(p.device_id ?? p.deviceId ?? p.habitacion ?? p.room ?? '').trim();\nconst habitacion = String(p.habitacion ?? p.room ?? deviceId).trim();\nconst contextoRaw = String(p.contexto_hotel ?? p.room_context ?? 'LIBRE').trim().toUpperCase();\nconst contextoHotel = ['LIBRE', 'RESERVADA', 'FUMIGACION'].includes(contextoRaw) ? contextoRaw : 'LIBRE';\n\nconst out = {\n    device_id: deviceId,\n    habitacion,\n    contexto_hotel: contextoHotel,\n    timestamp: normalizeTimestamp(p.timestamp ?? p.timestamp_ms ?? Date.now()),\n    sistema_activo: typeof p.sistema_activo === 'boolean' ? p.sistema_activo : null,\n    intervalo_envio_ms: toNumberOrNull(p.intervalo_envio_ms),\n    fosfina_mq135: toNumberOrNull(p.fosfina_mq135 ?? p.mq135),\n    co_mq7: toNumberOrNull(p.co_mq7 ?? p.mq7),\n    presencia_pir: toBoolean(p.presencia_pir ?? p.motion, false),\n    evento_pir: p.evento_pir ? String(p.evento_pir) : null,\n    temperatura_C: toNumberOrNull(p.temperatura_C ?? p.temperature_C),\n    humedad_pct: toNumberOrNull(p.humedad_pct ?? p.humidity_pct),\n    dht_ok: typeof p.dht_ok === 'boolean' ? p.dht_ok : null,\n    error: p.error ? String(p.error) : null\n};\n\nconst errors = [];\nif (!out.device_id) errors.push('device_id requerido');\nif (!out.habitacion) errors.push('habitacion requerida');\nif (!out.timestamp) errors.push('timestamp invalido');\nif (!Number.isFinite(out.fosfina_mq135)) errors.push('fosfina_mq135 invalido');\nif (!Number.isFinite(out.co_mq7)) errors.push('co_mq7 invalido');\n\nif (errors.length > 0) {\n    msg.error = errors.join('; ');\n    msg.validation_errors = errors;\n    msg.payload = p;\n    return [null, msg];\n}\n\nmsg.payload = out;\nreturn [msg, null];",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 570,
+    "y": 120,
+    "wires": [["0d9627be4652cda1"], ["0b9326811c83e391"]]
+  },
+  {
+    "id": "0b9326811c83e391",
+    "type": "debug",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "debug payload invalido",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "error",
+    "targetType": "msg",
+    "statusVal": "error",
+    "statusType": "msg",
+    "x": 840,
+    "y": 180,
+    "wires": []
+  },
+  {
+    "id": "0d9627be4652cda1",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "procesar estados (backend)",
+    "func": "const p = msg.payload;\n\nconst contextFromPayload = String(p.contexto_hotel || '').toUpperCase();\nconst validContexts = ['LIBRE', 'RESERVADA', 'FUMIGACION'];\nlet contexto = flow.get('estado_habitacion') || 'LIBRE';\nif (validContexts.includes(contextFromPayload) && contextFromPayload !== contexto) {\n    contexto = contextFromPayload;\n    flow.set('estado_habitacion', contexto);\n}\n\nconst PH3_PEL = Number(env.get('PH3_PEL_PPM') || 0.3);\nconst PH3_STEL = Number(env.get('PH3_STEL_PPM') || 1.0);\nconst PH3_IRRIT_LOW = Number(env.get('PH3_IRRIT_LOW_PPM') || 5);\nconst PH3_IRRIT_HIGH = Number(env.get('PH3_IRRIT_HIGH_PPM') || 10);\nconst PH3_IDLH = Number(env.get('PH3_IDLH_PPM') || 50);\nconst PH3_LETHAL_LOW = Number(env.get('PH3_LETHAL_LOW_PPM') || 400);\n\nconst CO_PEL = Number(env.get('CO_PEL_PPM') || 50);\nconst CO_HEADACHE = Number(env.get('CO_HEADACHE_PPM') || 200);\nconst CO_STEL = Number(env.get('CO_STEL_PPM') || 400);\nconst CO_SEVERE = Number(env.get('CO_SEVERE_PPM') || 800);\nconst CO_IDLH = Number(env.get('CO_IDLH_PPM') || 1500);\n\nconst TEMP_ALERTA = Number(env.get('TEMP_ALERTA_C') || 35);\nconst TEMP_INCENDIO = Number(env.get('UMBRAL_TEMP_INCENDIO') || 45);\n\nconst MQ135_MIN = Number(env.get('MQ135_RAW_MIN') || 0);\nconst MQ135_MAX = Number(env.get('MQ135_RAW_MAX') || 4095);\nconst MQ7_MIN = Number(env.get('MQ7_RAW_MIN') || 0);\nconst MQ7_MAX = Number(env.get('MQ7_RAW_MAX') || 4095);\nconst MQ135_PPM_MAX = Number(env.get('PH3_PPM_MAX_EST') || 120);\nconst MQ7_PPM_MAX = Number(env.get('CO_PPM_MAX_EST') || 2000);\n\nfunction clamp(v, lo, hi) {\n    return Math.max(lo, Math.min(hi, v));\n}\n\nfunction mapRawToPpm(raw, inMin, inMax, outMax) {\n    const x = clamp(Number(raw), inMin, inMax);\n    const ratio = (x - inMin) / Math.max(1, (inMax - inMin));\n    return ratio * outMax;\n}\n\nfunction hasNum(v) {\n    return Number.isFinite(Number(v));\n}\n\nconst ph3Ppm = hasNum(p.ph3_ppm) ? Number(p.ph3_ppm) : mapRawToPpm(p.fosfina_mq135, MQ135_MIN, MQ135_MAX, MQ135_PPM_MAX);\nconst coPpm = hasNum(p.co_ppm) ? Number(p.co_ppm) : mapRawToPpm(p.co_mq7, MQ7_MIN, MQ7_MAX, MQ7_PPM_MAX);\nconst tempC = hasNum(p.temperatura_C) ? Number(p.temperatura_C) : null;\n\nlet estado = 'NORMAL';\nlet razon = 'sin_alertas';\nlet nivel_alerta = 'NORMAL';\nlet color_alerta = 'green';\n\nif (contexto === 'FUMIGACION') {\n    if (p.presencia_pir) {\n        estado = 'EMERGENCIA';\n        razon = 'intruso_en_fumigacion';\n        nivel_alerta = 'CRITICO: INTRUSO EN FUMIGACION';\n        color_alerta = 'red';\n    } else if (ph3Ppm >= PH3_IDLH || coPpm >= CO_IDLH || (tempC !== null && tempC >= TEMP_INCENDIO)) {\n        estado = 'EMERGENCIA';\n        razon = 'riesgo_letal_en_fumigacion';\n        nivel_alerta = 'CRITICO: RIESGO LETAL EN FUMIGACION';\n        color_alerta = 'red';\n    } else if (ph3Ppm >= PH3_PEL || coPpm >= CO_PEL || (tempC !== null && tempC >= TEMP_ALERTA)) {\n        estado = 'ALERTA';\n        razon = 'operacion_fumigacion_vigilada';\n        nivel_alerta = 'ALERTA: FUMIGACION ACTIVA BAJO VIGILANCIA';\n        color_alerta = 'yellow';\n    }\n} else {\n    if (ph3Ppm >= PH3_LETHAL_LOW || coPpm >= CO_IDLH || (tempC !== null && tempC >= TEMP_INCENDIO)) {\n        estado = 'EMERGENCIA';\n        razon = 'riesgo_critico_ambiental';\n        nivel_alerta = ph3Ppm >= PH3_LETHAL_LOW\n            ? 'CRITICO: FOSFINA NIVEL LETAL'\n            : (coPpm >= CO_IDLH ? 'CRITICO: CO IDLH' : 'CRITICO: CONATO DE INCENDIO');\n        color_alerta = 'red';\n    } else if (ph3Ppm >= PH3_IDLH || coPpm >= CO_SEVERE || (tempC !== null && tempC >= TEMP_ALERTA)) {\n        estado = 'ALERTA';\n        razon = 'riesgo_alto';\n        nivel_alerta = ph3Ppm >= PH3_IDLH\n            ? 'ALERTA: FOSFINA SOBRE IDLH'\n            : (coPpm >= CO_SEVERE ? 'ALERTA: CO NIVEL SEVERO' : 'ALERTA: TEMPERATURA ELEVADA');\n        color_alerta = 'yellow';\n    } else if (ph3Ppm >= PH3_IRRIT_LOW || coPpm >= CO_STEL) {\n        estado = 'ALERTA';\n        razon = 'riesgo_moderado';\n        nivel_alerta = (ph3Ppm >= PH3_IRRIT_LOW && ph3Ppm <= PH3_IRRIT_HIGH)\n            ? 'ALERTA: IRRITACION POR FOSFINA'\n            : 'ALERTA: CO SOBRE STEL';\n        color_alerta = 'yellow';\n    } else if (ph3Ppm >= PH3_STEL || coPpm >= CO_HEADACHE) {\n        estado = 'ALERTA';\n        razon = 'riesgo_inicial';\n        nivel_alerta = ph3Ppm >= PH3_STEL\n            ? 'ALERTA: FOSFINA SOBRE STEL'\n            : 'ALERTA: CO POSIBLE CEFALEA';\n        color_alerta = 'yellow';\n    } else if (ph3Ppm >= PH3_PEL || coPpm >= CO_PEL) {\n        estado = 'ALERTA';\n        razon = 'sobre_pel';\n        nivel_alerta = 'ALERTA: SOBRE LIMITE PERMISIBLE (PEL)';\n        color_alerta = 'yellow';\n    }\n}\n\nconst statusText = `${p.habitacion} | ${estado}`.slice(0, 64);\nif (estado === 'EMERGENCIA') {\n    node.status({ fill: 'red', shape: 'dot', text: statusText });\n} else if (estado === 'ALERTA') {\n    node.status({ fill: 'yellow', shape: 'dot', text: statusText });\n} else {\n    node.status({ fill: 'green', shape: 'dot', text: statusText });\n}\n\nmsg.payload = {\n    ...p,\n    contexto_hotel: contexto,\n    estado_riesgo: estado,\n    razon_riesgo: razon,\n    nivel_alerta,\n    color_alerta,\n    ph3_ppm: Number(ph3Ppm.toFixed(2)),\n    co_ppm: Number(coPpm.toFixed(2)),\n    backend_ts: Date.now()\n};\n\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 860,
+    "y": 120,
+    "wires": [["2288e4f69a485380", "f763f562a6d47815"]]
+  },
+  {
+    "id": "f763f562a6d47815",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "build SQL insert bruta",
+    "func": "const p = msg.payload || {};\n\nfunction toNumberOrNull(v, digits = null) {\n    const n = Number(v);\n    if (!Number.isFinite(n)) return null;\n    return digits === null ? n : Number(n.toFixed(digits));\n}\n\nfunction toMysqlDateTime(isoLike) {\n    const dt = new Date(isoLike);\n    if (!Number.isFinite(dt.getTime())) {\n        const now = new Date();\n        return now.toISOString().slice(0, 19).replace('T', ' ');\n    }\n    return dt.toISOString().slice(0, 19).replace('T', ' ');\n}\n\nmsg.deviceId = String(p.device_id || 'N/A');\nmsg.habitacion = String(p.habitacion || msg.deviceId);\nmsg.contextoHotel = String(p.contexto_hotel || 'LIBRE');\nmsg.estadoRiesgo = String(p.estado_riesgo || 'INVALIDO').toUpperCase();\nmsg.razonRiesgo = String(p.razon_riesgo || 'sin_razon');\nmsg.nivelAlerta = String(p.nivel_alerta || 'N/A');\nmsg.colorAlerta = String(p.color_alerta || 'grey');\nmsg.backendTs = Number.isFinite(Number(p.backend_ts)) ? Number(p.backend_ts) : Date.now();\n\nmsg.topic = 'INSERT INTO mediciones_brutas (device_id, habitacion, contexto_hotel, temperatura_c, humedad_pct, fosfina_mq135, co_mq7, ph3_ppm, co_ppm, presencia_pir, evento_pir, sistema_activo, intervalo_envio_ms, dht_ok, error, timestamp_origen) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';\nmsg.payload = [\n    msg.deviceId,\n    msg.habitacion,\n    msg.contextoHotel,\n    toNumberOrNull(p.temperatura_C, 2),\n    toNumberOrNull(p.humedad_pct, 2),\n    toNumberOrNull(p.fosfina_mq135, 2),\n    toNumberOrNull(p.co_mq7, 2),\n    toNumberOrNull(p.ph3_ppm, 2),\n    toNumberOrNull(p.co_ppm, 2),\n    p.presencia_pir ? 1 : 0,\n    p.evento_pir ? String(p.evento_pir) : null,\n    typeof p.sistema_activo === 'boolean' ? (p.sistema_activo ? 1 : 0) : null,\n    toNumberOrNull(p.intervalo_envio_ms),\n    typeof p.dht_ok === 'boolean' ? (p.dht_ok ? 1 : 0) : null,\n    p.error ? String(p.error) : null,\n    toMysqlDateTime(p.timestamp)\n];\nmsg.queryType = 'insert_bruta';\n\nreturn msg;",
+    "outputs": 1,
+    "timeout": "",
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1140,
+    "y": 80,
+    "wires": [["dca3b24a91085534"]]
+  },
+  {
+    "id": "f8ea723cc2bc635b",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "build SQL insert estado",
+    "func": "const medicionId = Number(msg.payload && msg.payload.insertId);\nif (!Number.isFinite(medicionId) || medicionId <= 0) {\n    return null;\n}\n\nmsg.medicionId = medicionId;\nif (msg.deviceId) {\n    flow.set(`last_medicion_${msg.deviceId}`, medicionId);\n}\n\nmsg.topic = 'INSERT INTO estados_medicion (medicion_id, estado_riesgo, razon_riesgo, nivel_alerta, color_alerta, backend_ts) VALUES (?, ?, ?, ?, ?, ?)';\nmsg.payload = [\n    medicionId,\n    String(msg.estadoRiesgo || 'INVALIDO').toUpperCase(),\n    String(msg.razonRiesgo || ''),\n    String(msg.nivelAlerta || ''),\n    String(msg.colorAlerta || 'grey'),\n    Number.isFinite(Number(msg.backendTs)) ? Number(msg.backendTs) : null\n];\nmsg.queryType = 'insert_estado';\nreturn msg;",
+    "outputs": 1,
+    "timeout": "",
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1160,
+    "y": 120,
+    "wires": [["dca3b24a91085534"]]
+  },
+  {
+    "id": "2288e4f69a485380",
+    "type": "switch",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "ESTADOS",
+    "property": "payload.estado_riesgo",
+    "propertyType": "msg",
+    "rules": [
+      {
+        "t": "eq",
+        "v": "NORMAL",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "ALERTA",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "EMERGENCIA",
+        "vt": "str"
+      },
+      {
+        "t": "else"
+      }
+    ],
+    "checkall": "true",
+    "repair": false,
+    "outputs": 4,
+    "x": 1080,
+    "y": 240,
+    "wires": [
+      ["f3051d0a930d0937", "2e03c35144a59e1e"],
+      ["0f1953d279663222", "2e03c35144a59e1e"],
+      ["d1a88de4b3256373", "2e03c35144a59e1e"],
+      ["4aebca3950c2d155"]
+    ]
+  },
+  {
+    "id": "2e03c35144a59e1e",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "politica comandos",
+    "func": "const src = msg.payload || {};\nconst risk = String(src.estado_riesgo || '').toUpperCase();\nif (!['NORMAL', 'ALERTA', 'EMERGENCIA'].includes(risk)) return null;\n\nconst intervalByRisk = {\n    NORMAL: Number(env.get('SAMPLE_MS_NORMAL') || 15000),\n    ALERTA: Number(env.get('SAMPLE_MS_ALERTA') || 7000),\n    EMERGENCIA: Number(env.get('SAMPLE_MS_EMERGENCIA') || 3000)\n};\n\nconst intervalMs = Number(intervalByRisk[risk]);\nif (!Number.isFinite(intervalMs) || intervalMs <= 0) return null;\n\nconst contexto = flow.get('estado_habitacion') || String(src.contexto_hotel || 'LIBRE').toUpperCase();\nconst deviceId = String(src.device_id || src.habitacion || 'N/A');\nconst habitacion = String(src.habitacion || deviceId);\nconst cmd = 'INICIAR';\n\nconst cooldownMs = Number(env.get('CMD_COOLDOWN_MS') || 15000);\nconst now = Date.now();\nconst lastAt = Number(flow.get('last_cmd_at') || 0);\nconst lastSig = flow.get('last_cmd_sig') || '';\nconst sig = `${deviceId}|${risk}|${contexto}|${intervalMs}`;\n\nif ((now - lastAt) < cooldownMs && lastSig === sig) {\n    return null;\n}\n\nflow.set('last_cmd_at', now);\nflow.set('last_cmd_sig', sig);\n\nmsg.commandMeta = {\n    device_id: deviceId,\n    habitacion,\n    estado_riesgo: risk,\n    contexto_hotel: contexto,\n    motivo_activacion: String(src.razon_riesgo || src.nivel_alerta || 'ajuste_automatico'),\n    comando: cmd,\n    intervalo_objetivo_ms: intervalMs,\n    timestamp_origen: src.timestamp || null,\n    backend_ts: Number.isFinite(Number(src.backend_ts)) ? Number(src.backend_ts) : now\n};\n\nmsg.topic = env.get('TOPICO_COMANDOS') || 'alejandro.bravo_isa@uao.edu.co/comandos';\nmsg.payload = {\n    msg: cmd,\n    estado: contexto,\n    sample_interval_ms: intervalMs,\n    device_id: deviceId\n};\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1310,
+    "y": 280,
+    "wires": [["80fc9f72dc148d75", "5b960acf29f7316e", "240b2d8068f981ea"]]
+  },
+  {
+    "id": "240b2d8068f981ea",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "build SQL insert evento",
+    "func": "const meta = msg.commandMeta || {};\nif (!meta.device_id) {\n    return null;\n}\n\nfunction toMysqlDateTime(isoLike) {\n    const dt = new Date(isoLike);\n    if (!Number.isFinite(dt.getTime())) {\n        return null;\n    }\n    return dt.toISOString().slice(0, 19).replace('T', ' ');\n}\n\nconst lastId = flow.get(`last_medicion_${meta.device_id}`);\nconst medicionId = Number.isFinite(Number(lastId)) ? Number(lastId) : null;\n\nmsg.topic = 'INSERT INTO eventos_actuadores (medicion_id, device_id, habitacion, estado_riesgo, contexto_hotel, motivo_activacion, comando, intervalo_objetivo_ms, timestamp_origen, backend_ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';\nmsg.payload = [\n    medicionId,\n    String(meta.device_id),\n    String(meta.habitacion || meta.device_id),\n    String(meta.estado_riesgo || 'INVALIDO').toUpperCase(),\n    String(meta.contexto_hotel || 'LIBRE').toUpperCase(),\n    String(meta.motivo_activacion || 'sin_motivo'),\n    String(meta.comando || 'INICIAR'),\n    Number.isFinite(Number(meta.intervalo_objetivo_ms)) ? Number(meta.intervalo_objetivo_ms) : null,\n    toMysqlDateTime(meta.timestamp_origen),\n    Number.isFinite(Number(meta.backend_ts)) ? Number(meta.backend_ts) : null\n];\nmsg.queryType = 'insert_evento';\nreturn msg;",
+    "outputs": 1,
+    "timeout": "",
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1570,
+    "y": 280,
+    "wires": [["dca3b24a91085534"]]
+  },
+  {
+    "id": "80fc9f72dc148d75",
+    "type": "mqtt out",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "mqtt out comandos",
+    "topic": "${TOPICO_COMANDOS}",
+    "qos": "1",
+    "retain": "false",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "a1b2c3d4e5f60111",
+    "x": 1560,
+    "y": 220,
+    "wires": []
+  },
+  {
+    "id": "5b960acf29f7316e",
+    "type": "debug",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "debug comando emitido",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1580,
+    "y": 320,
+    "wires": []
+  },
+  {
+    "id": "f3051d0a930d0937",
+    "type": "debug",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "debug NORMAL",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "payload.nivel_alerta",
+    "statusType": "msg",
+    "x": 1320,
+    "y": 380,
+    "wires": []
+  },
+  {
+    "id": "0f1953d279663222",
+    "type": "debug",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "debug ALERTA",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "payload.nivel_alerta",
+    "statusType": "msg",
+    "x": 1320,
+    "y": 420,
+    "wires": []
+  },
+  {
+    "id": "d1a88de4b3256373",
+    "type": "debug",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "debug EMERGENCIA",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "payload.nivel_alerta",
+    "statusType": "msg",
+    "x": 1340,
+    "y": 460,
+    "wires": []
+  },
+  {
+    "id": "4aebca3950c2d155",
+    "type": "debug",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "debug OTROS/INVALIDO",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "true",
+    "targetType": "full",
+    "statusVal": "error",
+    "statusType": "msg",
+    "x": 1350,
+    "y": 500,
+    "wires": []
+  },
+  {
+    "id": "dca3b24a91085534",
+    "type": "mysql",
+    "z": "b7d6c0b9c8cf00d5",
+    "mydb": "d9f3d61e3a4c0aaa",
+    "name": "mysql query",
+    "x": 910,
+    "y": 700,
+    "wires": [["fc80bb460f478219"]]
+  },
+  {
+    "id": "fc80bb460f478219",
+    "type": "switch",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "tipo consulta",
+    "property": "queryType",
+    "propertyType": "msg",
+    "rules": [
+      {
+        "t": "eq",
+        "v": "insert_bruta",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "insert_estado",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "insert_evento",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "select",
+        "vt": "str"
+      }
+    ],
+    "checkall": "true",
+    "repair": false,
+    "outputs": 4,
+    "x": 1090,
+    "y": 700,
+    "wires": [
+      ["f8ea723cc2bc635b"],
+      ["f21fe10c8747b920"],
+      ["a4fd53edb295f7f8"],
+      ["a358d6afacf0c7a4"]
+    ]
+  },
+  {
+    "id": "f21fe10c8747b920",
+    "type": "debug",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "debug mysql insert estado",
+    "active": true,
+    "tosidebar": false,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload.affectedRows",
+    "targetType": "msg",
+    "statusVal": "payload.affectedRows",
+    "statusType": "msg",
+    "x": 1320,
+    "y": 660,
+    "wires": []
+  },
+  {
+    "id": "a4fd53edb295f7f8",
+    "type": "debug",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "debug mysql insert evento",
+    "active": true,
+    "tosidebar": false,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload.affectedRows",
+    "targetType": "msg",
+    "statusVal": "payload.affectedRows",
+    "statusType": "msg",
+    "x": 1320,
+    "y": 700,
+    "wires": []
+  },
+  {
+    "id": "a358d6afacf0c7a4",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "formato select tabla",
+    "func": "const rows = Array.isArray(msg.payload) ? msg.payload : [];\n\nif (rows.length === 0) {\n    msg.payload = 'Sin resultados';\n    return msg;\n}\n\nconst safe = (v) => String(v ?? '');\nconst maxRows = 20;\nconst data = rows.slice(0, maxRows);\n\nconst cols = Object.keys(data[0] || {}).sort((a, b) => a.localeCompare(b));\nif (cols.length === 0) {\n    msg.payload = 'Sin columnas para mostrar';\n    return msg;\n}\n\nconst widths = cols.map((c) => c.length);\nfor (const r of data) {\n    cols.forEach((c, i) => {\n        const l = safe(r[c]).length;\n        if (l > widths[i]) widths[i] = Math.min(l, 40);\n    });\n}\n\nconst trunc = (s, w) => (s.length > w ? s.slice(0, w - 1) + '...' : s);\nconst pad = (s, w) => trunc(s, w).padEnd(w, ' ');\n\nconst header = cols.map((c, i) => pad(c, widths[i])).join(' | ');\nconst sep = widths.map((w) => '-'.repeat(w)).join('-+-');\nconst body = data.map((r) => cols.map((c, i) => pad(safe(r[c]), widths[i])).join(' | ')).join('\\n');\n\nmsg.payload = `Filas devueltas: ${rows.length}\\n\\n${header}\\n${sep}\\n${body}`;\nreturn msg;",
+    "outputs": 1,
+    "timeout": "",
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1280,
+    "y": 760,
+    "wires": [["b8115394c5d54f94"]]
+  },
+  {
+    "id": "b8115394c5d54f94",
+    "type": "debug",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "debug select tabla",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1460,
+    "y": 760,
+    "wires": []
+  },
+  {
+    "id": "280c86b4c143abc4",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "SELECT ultimas 20",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "",
+    "payloadType": "date",
+    "x": 200,
+    "y": 640,
+    "wires": [["36d294dd3d7fc199"]]
+  },
+  {
+    "id": "0761efe88fe2a347",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "SELECT EMERGENCIA",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "EMERGENCIA",
+    "payloadType": "str",
+    "x": 220,
+    "y": 680,
+    "wires": [["36d294dd3d7fc199"]]
+  },
+  {
+    "id": "7f15449ad1f2682c",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "SELECT ALERTA",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "ALERTA",
+    "payloadType": "str",
+    "x": 210,
+    "y": 720,
+    "wires": [["36d294dd3d7fc199"]]
+  },
+  {
+    "id": "431bf11ecee0cbf4",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "SELECT NORMAL",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "NORMAL",
+    "payloadType": "str",
+    "x": 210,
+    "y": 760,
+    "wires": [["36d294dd3d7fc199"]]
+  },
+  {
+    "id": "bc7fb6bb733b6f28",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "RESUMEN ALERTAS",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "RESUMEN_ALERTAS",
+    "payloadType": "str",
+    "x": 220,
+    "y": 800,
+    "wires": [["36d294dd3d7fc199"]]
+  },
+  {
+    "id": "edecdad222f9e09d",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "SELECT BRUTAS (ULTIMAS 20)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "BRUTAS_RECIENTES",
+    "payloadType": "str",
+    "x": 250,
+    "y": 840,
+    "wires": [["36d294dd3d7fc199"]]
+  },
+  {
+    "id": "eb02b22c71c90b33",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "SELECT EVENTOS (ULTIMOS 20)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "EVENTOS_RECIENTES",
+    "payloadType": "str",
+    "x": 250,
+    "y": 880,
+    "wires": [["36d294dd3d7fc199"]]
+  },
+  {
+    "id": "36d294dd3d7fc199",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "build SQL select",
+    "func": "const token = String(msg.payload || '').trim().toUpperCase();\nconst baseJoin = 'SELECT m.id, m.device_id, m.habitacion, m.contexto_hotel, m.temperatura_c, m.humedad_pct, m.fosfina_mq135, m.co_mq7, m.ph3_ppm, m.co_ppm, e.estado_riesgo, e.razon_riesgo, e.nivel_alerta, e.color_alerta, m.timestamp_origen, m.created_at FROM mediciones_brutas m INNER JOIN estados_medicion e ON e.medicion_id = m.id';\n\nif (['NORMAL', 'ALERTA', 'EMERGENCIA'].includes(token)) {\n    msg.topic = `${baseJoin} WHERE e.estado_riesgo='${token}' ORDER BY m.id DESC LIMIT 20`;\n} else if (token === 'RESUMEN_ALERTAS') {\n    msg.topic = \"SELECT estado_riesgo, COUNT(*) AS total, MAX(created_at) AS ultima_medicion FROM estados_medicion WHERE estado_riesgo IN ('ALERTA','EMERGENCIA') GROUP BY estado_riesgo ORDER BY total DESC\";\n} else if (token === 'BRUTAS_RECIENTES') {\n    msg.topic = 'SELECT id, device_id, habitacion, contexto_hotel, temperatura_c, humedad_pct, fosfina_mq135, co_mq7, ph3_ppm, co_ppm, presencia_pir, evento_pir, timestamp_origen, created_at FROM mediciones_brutas ORDER BY id DESC LIMIT 20';\n} else if (token === 'EVENTOS_RECIENTES') {\n    msg.topic = 'SELECT id, medicion_id, device_id, habitacion, estado_riesgo, contexto_hotel, motivo_activacion, comando, intervalo_objetivo_ms, timestamp_origen, backend_ts, created_at FROM eventos_actuadores ORDER BY id DESC LIMIT 20';\n} else {\n    msg.topic = `${baseJoin} ORDER BY m.id DESC LIMIT 20`;\n}\n\nmsg.queryType = 'select';\nmsg.payload = [];\nreturn msg;",
+    "outputs": 1,
+    "timeout": "",
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 510,
+    "y": 760,
+    "wires": [["dca3b24a91085534"]]
+  },
+  {
+    "id": "5f140744d347019a",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "Contexto LIBRE",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "${TOPICO_COMANDOS}",
+    "payload": "{\"estado\":\"LIBRE\"}",
+    "payloadType": "json",
+    "x": 180,
+    "y": 320,
+    "wires": [["5798f954f5e9c111"]]
+  },
+  {
+    "id": "06534d6bf41c8a53",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "Contexto RESERVADA",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "${TOPICO_COMANDOS}",
+    "payload": "{\"estado\":\"RESERVADA\"}",
+    "payloadType": "json",
+    "x": 200,
+    "y": 360,
+    "wires": [["5798f954f5e9c111"]]
+  },
+  {
+    "id": "0c6e95a9f1a5ef0e",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "Contexto FUMIGACION",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "${TOPICO_COMANDOS}",
+    "payload": "{\"estado\":\"FUMIGACION\"}",
+    "payloadType": "json",
+    "x": 210,
+    "y": 400,
+    "wires": [["5798f954f5e9c111"]]
+  },
+  {
+    "id": "5798f954f5e9c111",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "set contexto backend + forward",
+    "func": "const estado = String(msg?.payload?.estado || '').toUpperCase();\nconst validos = ['LIBRE', 'RESERVADA', 'FUMIGACION'];\nif (!validos.includes(estado)) {\n    node.warn('estado invalido: ' + estado);\n    return null;\n}\nflow.set('estado_habitacion', estado);\nmsg.topic = env.get('TOPICO_COMANDOS') || 'alejandro.bravo_isa@uao.edu.co/comandos';\nmsg.payload = { msg: 'INICIAR', estado };\nreturn msg;",
+    "outputs": 1,
+    "timeout": "",
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 490,
+    "y": 360,
+    "wires": [["80fc9f72dc148d75", "5b960acf29f7316e"]]
+  },
+  {
+    "id": "a1b2c3d4e5f60111",
+    "type": "mqtt-broker",
+    "name": "Broker MQTT",
+    "broker": "${MQTT_SERVER}",
+    "port": "${MQTT_PORT}",
+    "clientid": "",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": true,
+    "autoUnsubscribe": true,
+    "birthTopic": "",
+    "birthQos": "0",
+    "birthRetain": "false",
+    "birthPayload": "",
+    "birthMsg": {},
+    "closeTopic": "",
+    "closeQos": "0",
+    "closeRetain": "false",
+    "closePayload": "",
+    "closeMsg": {},
+    "willTopic": "",
+    "willQos": "0",
+    "willRetain": "false",
+    "willPayload": "",
+    "willMsg": {},
+    "userProps": "",
+    "sessionExpiry": ""
+  },
+  {
+    "id": "d9f3d61e3a4c0aaa",
+    "type": "MySQLdatabase",
+    "name": "mysql-iot",
+    "host": "mysql",
+    "port": "3306",
+    "db": "ciudad_inteligente",
+    "tz": "",
+    "charset": "UTF8"
+  },
+  {
+    "id": "e2cdef387b652a1d",
+    "type": "global-config",
+    "env": [],
+    "modules": {
+      "node-red-node-mysql": "3.0.0"
     }
+  }
 ]
