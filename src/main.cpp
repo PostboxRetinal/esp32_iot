@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <PubSubClient.h>
-#include <DHT.h>
+#include <DHTesp.h>
 #include <WiFi.h>
 #include <time.h>
 #include <config.h>
@@ -45,7 +45,7 @@ int sensorMQ7;
 int movimiento;
 int pirState = LOW;
 
-DHT dht11(DHT11_PIN, DHT11);
+DHTesp dht11;
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
 
@@ -189,7 +189,7 @@ void setup() {
   pinMode(LED_INTEGRADO, OUTPUT);
   digitalWrite(LED_INTEGRADO, LOW);
 
-  dht11.begin();
+  dht11.setup(DHT11_PIN, DHTesp::DHT11);
 
   setup_wifi();
 
@@ -238,8 +238,9 @@ void loop() {
   delayMicroseconds(10);
   sensorMQ7   = analogRead(MQ7_ANALOG_PIN);
   movimiento  = digitalRead(PIR_DIGITAL_PIN);
-  float humidity    = dht11.readHumidity();
-  float temperature = dht11.readTemperature();
+  TempAndHumidity dhtReading = dht11.getTempAndHumidity();
+  float humidity = dhtReading.humidity;
+  float temperature = dhtReading.temperature;
 
   bool motion = (movimiento == HIGH);
   const char* event = nullptr;
@@ -257,6 +258,7 @@ void loop() {
   JsonDocument doc;
   String timestamp = getUtcOffsetIsoTimestamp();
   doc["timestamp"] = timestamp;
+  doc["device_id"] = "ESP32-HW-01";
   doc["habitacion"] = "HTL-N-P1-103";
   doc["contexto_hotel"] = estadoHabitacion;
   doc["sistema_activo"] = sistemaActivo;
@@ -266,8 +268,8 @@ void loop() {
   doc["presencia_pir"] = motion;
   if (event) doc["evento_pir"] = event;
 
-  if (isnan(humidity) || isnan(temperature)) {
-    doc["error"] = "Fallo lectura DHT11";
+  if (dht11.getStatus() != DHTesp::ERROR_NONE || isnan(humidity) || isnan(temperature)) {
+    doc["error"] = String("Fallo lectura DHT11: ") + dht11.getStatusString();
     doc["dht_ok"] = false;
   } else {
     doc["dht_ok"] = true;
