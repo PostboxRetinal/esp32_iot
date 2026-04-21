@@ -201,9 +201,9 @@ void setup() {
   Serial.print("MQTT broker: "); 
   Serial.print(mqtt_server);
   Serial.print(":"); 
-  Serial.print(mqtt_port);
-  Serial.println("Alertas: "); 
-  Serial.print(topico_datos);
+  Serial.println(mqtt_port);
+  Serial.print("Alertas: "); 
+  Serial.println(topico_datos);
   Serial.print("Comandos: "); 
   Serial.println(topico_comandos);
 }
