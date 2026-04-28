@@ -22,7 +22,6 @@ CREATE TABLE IF NOT EXISTS mediciones_brutas (
   sistema_activo TINYINT(1) NULL,
   intervalo_envio_ms INT NULL,
   dht_ok TINYINT(1) NULL,
-  error VARCHAR(255) NULL,
   timestamp_origen DATETIME NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
