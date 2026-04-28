@@ -56,8 +56,8 @@ def snapshot_state() -> dict:
         }
 
 
-def on_connect(client, _userdata, _flags, rc):
-    print(f"Conectado a MQTT rc={rc}")
+def on_connect(client, _userdata, _flags, reason_code, _properties=None):
+    print(f"Conectado a MQTT reason_code={reason_code}")
     client.subscribe(TOPICO_COMANDOS, qos=QOS)
     print(f"Escuchando comandos en topic: {TOPICO_COMANDOS}")
 
@@ -161,7 +161,7 @@ def main() -> None:
     with state_lock:
         state["intervalo_envio_ms"] = clamp_interval_ms(state["intervalo_envio_ms"])
 
-    client = mqtt.Client(client_id=f"sim-{DEVICE_ID}-{int(time.time())}")
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"sim-{DEVICE_ID}-{int(time.time())}")
     if MQTT_USER:
         client.username_pw_set(MQTT_USER, MQTT_PASS)
 
