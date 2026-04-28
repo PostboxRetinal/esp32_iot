@@ -32,11 +32,13 @@ String estadoHabitacion = "LIBRE"; // Estados posibles: "LIBRE", "RESERVADA", "F
 const char* ssid = WIFI_SSID;
 const char* password = WIFI_PASSWORD;
 const char* mqtt_server = MQTT_SERVER;
-const int mqtt_port = MQTT_PORT;
+const int mqtt_port = 1883;
 const char* mqtt_user = MQTT_USER;
 const char* mqtt_pass = MQTT_PASS;
 const char* topico_datos = TOPICO_DATOS;
-const char* topico_comandos = TOPICO_COMANDOS;
+const char* device_id = DEVICE_ID;
+const char* habitacion = HABITACION;
+String topico_comandos = String(TOPICO_COMANDOS) + "/" + device_id;
 bool sistemaActivo = true;
 
 // Variables de estado de sensores
@@ -258,8 +260,8 @@ void loop() {
   JsonDocument doc;
   String timestamp = getUtcOffsetIsoTimestamp();
   doc["timestamp"] = timestamp;
-  doc["device_id"] = "ESP32-HW-01";
-  doc["habitacion"] = "HTL-N-P1-103";
+  doc["device_id"] = device_id;
+  doc["habitacion"] = habitacion;
   doc["contexto_hotel"] = estadoHabitacion;
   doc["sistema_activo"] = sistemaActivo;
   doc["intervalo_envio_ms"] = intervaloEnvioMs;
@@ -309,9 +311,9 @@ void reconnect() {
 
     if (mqttClient.connect(clientId.c_str(), mqtt_user, mqtt_pass)) {
       Serial.println(" ¡Conectado al Bróker MQTT!");
-      bool subscribed = mqttClient.subscribe(topico_comandos);
+      bool subscribed = mqttClient.subscribe(topico_comandos.c_str());
       if (subscribed) {
-        Serial.println("Escuchando comandos en: " + String(topico_comandos));
+        Serial.println("Escuchando comandos en: " + topico_comandos);
       } else {
         Serial.println("Fallo suscripcion al topico de comandos");
       }

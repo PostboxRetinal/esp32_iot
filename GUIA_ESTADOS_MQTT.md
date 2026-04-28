@@ -9,7 +9,7 @@ Esta guia explica como controlar por broker MQTT:
 ## 1) Como funciona el control (resumen rapido)
 
 - El dispositivo (ESP32 real o `simulator/simulate_nodes.py`) publica telemetria en `TOPICO_DATOS`.
-- Ese mismo dispositivo escucha comandos en `TOPICO_COMANDOS`.
+- Ese mismo dispositivo escucha comandos en `TOPICO_COMANDOS/device_id`.
 - Cuando recibe comando valido, actualiza su estado interno.
 - El siguiente mensaje de telemetria ya sale con el nuevo estado.
 
@@ -40,7 +40,7 @@ Campos disponibles:
 - `estado`: `LIBRE`, `RESERVADA`, `FUMIGACION`
 - `sample_interval_ms`: frecuencia de envio en ms
 - `intervalo_ms`: alias compatible para frecuencia
-- `device_id`: opcional; en simulador permite comando dirigido a un nodo concreto
+- `device_id`: obligatorio para enrutar el comando a un nodo concreto
 
 Rangos:
 - intervalo minimo: `1000` ms
@@ -51,6 +51,7 @@ Rangos:
 1. Verifica variables en `.env`:
    - `MQTT_SERVER`, `MQTT_PORT`, `MQTT_USER`, `MQTT_PASS`
    - `TOPICO_DATOS`, `TOPICO_COMANDOS`
+  - `DEVICE_ID` si vas a probar los ejemplos de shell con tu nodo local
 2. Levanta servicios:
    - `docker compose up --build -d`
 3. Verifica backend:
@@ -64,7 +65,7 @@ Rangos:
    - `Contexto RESERVADA`
    - `Contexto FUMIGACION`
 3. Haz click en el boton del inject deseado.
-4. Node-RED publica en `TOPICO_COMANDOS`.
+4. Node-RED publica en `TOPICO_COMANDOS/device_id`.
 5. El dispositivo aplica el contexto y lo reporta en la siguiente telemetria.
 
 ## 6) Cambiar estados por broker con comando (terminal)
@@ -72,35 +73,35 @@ Rangos:
 ### Opcion A: `mosquitto_pub` local
 
 ```bash
-mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"msg":"INICIAR","estado":"LIBRE","sample_interval_ms":15000}' -q 1
+mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS/ESP32-HW-01" -m '{"msg":"INICIAR","estado":"LIBRE","sample_interval_ms":15000,"device_id":"ESP32-HW-01"}' -q 1
 ```
 
 ### Opcion B: sin instalar nada (usando Docker)
 
 ```bash
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"msg":"INICIAR","estado":"LIBRE","sample_interval_ms":15000}' -q 1
+docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS/ESP32-HW-01" -m '{"msg":"INICIAR","estado":"LIBRE","sample_interval_ms":15000,"device_id":"ESP32-HW-01"}' -q 1
 ```
 
 Comandos tipicos:
 
 ```bash
 # Cambiar a RESERVADA
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"msg":"INICIAR","estado":"RESERVADA","sample_interval_ms":15000}' -q 1
+docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS/ESP32-HW-01" -m '{"msg":"INICIAR","estado":"RESERVADA","sample_interval_ms":15000,"device_id":"ESP32-HW-01"}' -q 1
 
 # Cambiar a FUMIGACION
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"msg":"INICIAR","estado":"FUMIGACION","sample_interval_ms":7000}' -q 1
+docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS/ESP32-HW-01" -m '{"msg":"INICIAR","estado":"FUMIGACION","sample_interval_ms":7000,"device_id":"ESP32-HW-01"}' -q 1
 
 # Pausar envio
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"msg":"PAUSA"}' -q 1
+docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS/ESP32-HW-01" -m '{"msg":"PAUSA","device_id":"ESP32-HW-01"}' -q 1
 
 # Reanudar envio
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"msg":"INICIAR"}' -q 1
+docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS/ESP32-HW-01" -m '{"msg":"INICIAR","device_id":"ESP32-HW-01"}' -q 1
 ```
 
 Comando dirigido a un simulador especifico:
 
 ```bash
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"msg":"INICIAR","estado":"LIBRE","device_id":"SIM-NODO-01"}' -q 1
+docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS/$SIM_DEVICE_ID" -m '{"msg":"INICIAR","estado":"LIBRE","device_id":"SIM-NODO-01"}' -q 1
 ```
 
 ## 7) PIR: que se puede comandar y que no
