@@ -18,9 +18,9 @@
 // ==========================================
 // 2. FRECUENCIA DE ENVÍO DE TELEMETRÍA (RAW)
 // ==========================================
-const unsigned long INTERVALO_ENVIO_DEFAULT_MS = 15000;
-const unsigned long INTERVALO_ENVIO_MIN_MS = 1000;
-const unsigned long INTERVALO_ENVIO_MAX_MS = 60000;
+const unsigned long INTERVALO_ENVIO_DEFAULT_MS = INTERVALO_ENVIO_DEFAULT;
+const unsigned long INTERVALO_ENVIO_MIN_MS = INTERVALO_ENVIO_MIN;
+const unsigned long INTERVALO_ENVIO_MAX_MS = INTERVALO_ENVIO_MAX;
 unsigned long intervaloEnvioMs = INTERVALO_ENVIO_DEFAULT_MS;
 
 // Variable global que guarda el contexto del sistema externo
@@ -32,7 +32,7 @@ String estadoHabitacion = "LIBRE"; // Estados posibles: "LIBRE", "RESERVADA", "F
 const char* ssid = WIFI_SSID;
 const char* password = WIFI_PASSWORD;
 const char* mqtt_server = MQTT_SERVER;
-const int mqtt_port = 1883;
+const int mqtt_port = MQTT_PORT;
 const char* mqtt_user = MQTT_USER;
 const char* mqtt_pass = MQTT_PASS;
 const char* topico_datos = TOPICO_DATOS;
