@@ -645,7 +645,7 @@
     "type": "function",
     "z": "b7d6c0b9c8cf00d5",
     "name": "set contexto backend + forward",
-    "func": "const estado = String(msg?.payload?.estado || '').toUpperCase();\nconst deviceId = String(msg?.payload?.device_id || '').trim();\nconst validos = ['LIBRE', 'RESERVADA', 'FUMIGACION'];\nif (!validos.includes(estado)) {\n    node.warn('estado invalido: ' + estado);\n    return null;\n}\nif (!deviceId) {\n    node.warn('device_id requerido para comando dirigido');\n    return null;\n}\nflow.set('estado_habitacion', estado);\nconst baseTopic = env.get('TOPICO_COMANDOS') || 'alejandro.bravo_isa@uao.edu.co/comandos';\nmsg.topic = `${baseTopic}/${deviceId}`;\nmsg.payload = { msg: 'INICIAR', estado, device_id: deviceId };\nreturn msg;",
+    "func": "const estado = String(msg?.payload?.estado || '').toUpperCase();\nconst deviceId = String(msg?.payload?.device_id || '').trim();\nconst validos = ['LIBRE', 'RESERVADA', 'FUMIGACION'];\nif (!validos.includes(estado)) {\n    node.warn('estado invalido: ' + estado);\n    return null;\n}\nif (!deviceId) {\n    node.warn('device_id requerido para comando dirigido');\n    return null;\n}\nflow.set('estado_habitacion', estado);\nconst baseTopic = env.get('TOPICO_COMANDOS') || 'alejandro.bravo_isa@uao.edu.co/comandos';\nmsg.topic = baseTopic;\nmsg.payload = { msg: 'INICIAR', estado, device_id: deviceId };\nreturn msg;",
     "outputs": 1,
     "timeout": "",
     "noerr": 0,

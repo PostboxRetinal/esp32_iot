@@ -38,7 +38,7 @@ const char* mqtt_pass = MQTT_PASS;
 const char* topico_datos = TOPICO_DATOS;
 const char* device_id = DEVICE_ID;
 const char* habitacion = HABITACION;
-String topico_comandos = String(TOPICO_COMANDOS) + "/" + device_id;
+const char* topico_comandos = TOPICO_COMANDOS;
 bool sistemaActivo = true;
 
 // Variables de estado de sensores
@@ -104,6 +104,14 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
   if (error) {
     Serial.println("ERROR: Error al parsear JSON de comando");
+    return;
+  }
+
+  String targetDevice = docCmd["device_id"] | "";
+  targetDevice.trim();
+  if (targetDevice.length() > 0 && targetDevice != device_id) {
+    Serial.print("Comando ignorado para device_id: ");
+    Serial.println(targetDevice);
     return;
   }
 
@@ -311,9 +319,9 @@ void reconnect() {
 
     if (mqttClient.connect(clientId.c_str(), mqtt_user, mqtt_pass)) {
       Serial.println(" ¡Conectado al Bróker MQTT!");
-      bool subscribed = mqttClient.subscribe(topico_comandos.c_str());
+      bool subscribed = mqttClient.subscribe(topico_comandos);
       if (subscribed) {
-        Serial.println("Escuchando comandos en: " + topico_comandos);
+        Serial.println(String("Escuchando comandos en: ") + topico_comandos);
       } else {
         Serial.println("Fallo suscripcion al topico de comandos");
       }

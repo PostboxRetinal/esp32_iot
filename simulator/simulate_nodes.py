@@ -13,7 +13,7 @@ MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_USER = os.getenv("MQTT_USER", "")
 MQTT_PASS = os.getenv("MQTT_PASS", "")
 TOPICO_DATOS = os.getenv("TOPICO_DATOS", "usuario/alertas")
-TOPICO_COMANDOS_BASE = os.getenv("TOPICO_COMANDOS", "usuario/comandos")
+TOPICO_COMANDOS = os.getenv("TOPICO_COMANDOS", "usuario/comandos")
 QOS = int(os.getenv("SIM_QOS", "1"))
 INTERVAL_SECONDS = max(float(os.getenv("SIM_INTERVAL_SECONDS", "7")), 1.0)
 DEVICE_ID = os.getenv("SIM_DEVICE_ID", os.getenv("HOSTNAME", "SIM-NODO")).strip() or "SIM-NODO"
@@ -35,7 +35,6 @@ state = {
     "contexto_hotel": CONTEXTO_INICIAL if CONTEXTO_INICIAL in VALID_CONTEXTOS else "LIBRE",
     "pir_prev": False,
 }
-TOPICO_COMANDOS = f"{TOPICO_COMANDOS_BASE.rstrip('/')}/{DEVICE_ID}"
 
 
 def iso_now() -> str:
@@ -73,7 +72,7 @@ def on_message(_client, _userdata, msg):
         return
 
     target = str(command.get("device_id") or "").strip()
-    if target != DEVICE_ID:
+    if target and target != DEVICE_ID:
         return
 
     changed = []
