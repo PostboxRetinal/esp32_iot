@@ -117,7 +117,7 @@ Simulador:
 Si quieres probar un caso puntual de intruso, puedes inyectar telemetria manual en `TOPICO_DATOS`:
 
 ```bash
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_DATOS" -m '{"device_id":"TEST-PIR-01","habitacion":"HTL-N-P1-103","timestamp":"2026-04-21T12:00:00Z","contexto_hotel":"FUMIGACION","sistema_activo":true,"intervalo_envio_ms":7000,"fosfina_mq135":1800,"co_mq7":300,"presencia_pir":true,"evento_pir":"movimiento_iniciado","dht_ok":true,"temperatura_C":28,"humedad_pct":60}' -q 1
+docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_DATOS" -m '{"device_id":"TEST-PIR-01","habitacion":"HTL-N-P1-103","timestamp":"2026-04-21T12:00:00Z","contexto_hotel":"FUMIGACION","intervalo_envio_ms":7000,"fosfina_mq135":1800,"co_mq7":300,"presencia_pir":true,"temperatura_C":28,"humedad_pct":60}' -q 1
 ```
 
 ## 8) Como validar que el cambio si aplico
@@ -131,13 +131,12 @@ Validacion 1: logs de dispositivo
 Validacion 2: telemetria MQTT
 - Suscribete a `TOPICO_DATOS` y confirma:
   - `contexto_hotel`
-  - `sistema_activo`
   - `intervalo_envio_ms`
-  - `presencia_pir` y `evento_pir`
+  - `presencia_pir`
 
 Validacion 3: MySQL
 - Revisar en `mediciones_brutas`:
-  - `contexto_hotel`, `sistema_activo`, `intervalo_envio_ms`, `presencia_pir`, `evento_pir`
+  - `contexto_hotel`, `intervalo_envio_ms`, `presencia_pir`
 
 ## 9) Errores comunes
 

@@ -253,14 +253,7 @@ void loop() {
   float temperature = dhtReading.temperature;
 
   bool motion = (movimiento == HIGH);
-  const char* event = nullptr;
-  if (motion && pirState == LOW) {
-    event    = "movimiento_iniciado";
-    pirState = HIGH;
-  } else if (!motion && pirState == HIGH) {
-    event    = "movimiento_detenido";
-    pirState = LOW;
-  }
+  pirState = motion ? HIGH : LOW;
 
   // ==========================================
   // 5. CREAR Y ENVIAR JSON (RAW, sin lógica de riesgo)
@@ -271,18 +264,12 @@ void loop() {
   doc["device_id"] = device_id;
   doc["habitacion"] = habitacion;
   doc["contexto_hotel"] = estadoHabitacion;
-  doc["sistema_activo"] = sistemaActivo;
   doc["intervalo_envio_ms"] = intervaloEnvioMs;
   doc["fosfina_mq135"] = sensorMQ135;
   doc["co_mq7"] = sensorMQ7;
   doc["presencia_pir"] = motion;
-  if (event) doc["evento_pir"] = event;
 
-  if (dht11.getStatus() != DHTesp::ERROR_NONE || isnan(humidity) || isnan(temperature)) {
-    doc["error"] = String("Fallo lectura DHT11: ") + dht11.getStatusString();
-    doc["dht_ok"] = false;
-  } else {
-    doc["dht_ok"] = true;
+  if (dht11.getStatus() == DHTesp::ERROR_NONE && !isnan(humidity) && !isnan(temperature)) {
     doc["temperatura_C"] = temperature;
     doc["humedad_pct"] = humidity;
   }

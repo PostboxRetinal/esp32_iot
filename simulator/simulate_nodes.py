@@ -20,7 +20,6 @@ DEVICE_ID = os.getenv("SIM_DEVICE_ID", os.getenv("HOSTNAME", "SIM-NODO")).strip(
 HABITACION = os.getenv("SIM_HABITACION", f"SIM-{DEVICE_ID}").strip() or f"SIM-{DEVICE_ID}"
 CONTEXTO_INICIAL = os.getenv("SIM_CONTEXTO_HOTEL", "LIBRE").strip().upper()
 SISTEMA_INICIAL = os.getenv("SIM_SISTEMA_ACTIVO", "true").strip().lower() in {"1", "true", "on", "si", "yes"}
-DHT_FAIL_PROB = float(os.getenv("SIM_DHT_FAIL_PROB", "0.05"))
 ALERT_PROB = float(os.getenv("SIM_ALERT_PROB", "0.22"))
 MOTION_PROB = float(os.getenv("SIM_MOTION_PROB", "0.3"))
 
@@ -30,7 +29,7 @@ MAX_INTERVAL_MS = 60000
 
 state_lock = threading.Lock()
 state = {
-    "sistema_activo": SISTEMA_INICIAL,
+    "activo": SISTEMA_INICIAL,
     "intervalo_envio_ms": int(INTERVAL_SECONDS * 1000),
     "contexto_hotel": CONTEXTO_INICIAL if CONTEXTO_INICIAL in VALID_CONTEXTOS else "LIBRE",
     "pir_prev": False,
@@ -48,7 +47,7 @@ def clamp_interval_ms(v: int) -> int:
 def snapshot_state() -> dict:
     with state_lock:
         return {
-            "sistema_activo": bool(state["sistema_activo"]),
+            "activo": bool(state["activo"]),
             "intervalo_envio_ms": int(state["intervalo_envio_ms"]),
             "contexto_hotel": str(state["contexto_hotel"]),
             "pir_prev": bool(state["pir_prev"]),
@@ -80,12 +79,12 @@ def on_message(_client, _userdata, msg):
     cmd = str(command.get("msg") or "").strip().upper()
     if cmd == "PAUSA":
         with state_lock:
-            state["sistema_activo"] = False
-        changed.append("sistema_activo=false")
+            state["activo"] = False
+        changed.append("activo=false")
     elif cmd == "INICIAR":
         with state_lock:
-            state["sistema_activo"] = True
-        changed.append("sistema_activo=true")
+            state["activo"] = True
+        changed.append("activo=true")
 
     intervalo = command.get("sample_interval_ms", command.get("intervalo_ms"))
     if intervalo is not None:
@@ -119,14 +118,6 @@ def build_payload() -> dict:
         mq7 = 900 + random.randint(0, 1400)
 
     motion = random.random() < MOTION_PROB
-    dht_ok = random.random() > DHT_FAIL_PROB
-
-    event = None
-    if motion and not s["pir_prev"]:
-        event = "movimiento_iniciado"
-    elif (not motion) and s["pir_prev"]:
-        event = "movimiento_detenido"
-
     with state_lock:
         state["pir_prev"] = motion
 
@@ -135,23 +126,14 @@ def build_payload() -> dict:
         "habitacion": HABITACION,
         "contexto_hotel": s["contexto_hotel"],
         "timestamp": iso_now(),
-        "sistema_activo": s["sistema_activo"],
         "intervalo_envio_ms": s["intervalo_envio_ms"],
         "fosfina_mq135": mq135,
         "co_mq7": mq7,
         "presencia_pir": motion,
     }
 
-    if event:
-        payload["evento_pir"] = event
-
-    if dht_ok:
-        payload["dht_ok"] = True
-        payload["temperatura_C"] = round(temp, 2)
-        payload["humedad_pct"] = round(35 + random.random() * 40, 2)
-    else:
-        payload["dht_ok"] = False
-        payload["error"] = "Fallo lectura DHT11 (simulado)"
+    payload["temperatura_C"] = round(temp, 2)
+    payload["humedad_pct"] = round(35 + random.random() * 40, 2)
 
     return payload
 
@@ -177,7 +159,7 @@ def main() -> None:
     try:
         while True:
             s = snapshot_state()
-            if s["sistema_activo"]:
+            if s["activo"]:
                 payload = build_payload()
                 body = json.dumps(payload, ensure_ascii=True)
                 result = client.publish(TOPICO_DATOS, body, qos=QOS, retain=False)
