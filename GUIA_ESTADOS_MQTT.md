@@ -138,6 +138,16 @@ Validacion 3: MySQL
 - Revisar en `mediciones_brutas`:
   - `contexto_hotel`, `intervalo_envio_ms`, `presencia_pir`
 
+### Trazabilidad de datos erroneos
+
+El sistema ya no descarta una medicion con problemas de calidad. La estrategia es:
+
+- `mediciones_brutas` conserva el registro original con `tiene_problema`, `estado_calidad`, `motivo_calidad` y `firma_medicion`.
+- `incidencias_medicion` guarda el detalle del problema detectado, por ejemplo duplicados, datos incompletos o huecos temporales.
+- Si llega una medicion repetida, se almacena en bruto y ademas queda marcada como incidencia para no perder trazabilidad.
+- `vw_mediciones_estado` permite ver en una sola consulta el dato bruto, el estado calculado y la calidad del registro.
+- Los injects de Node-RED para `RESUMEN_CALIDAD` e `INCIDENCIAS_RECIENTES` sirven para demostrar el analisis en clase.
+
 ## 9) Errores comunes
 
 - Estado no cambia:

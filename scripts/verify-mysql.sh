@@ -99,7 +99,7 @@ fi
 
 echo
 echo "5. Verificando tablas principales..."
-TABLES=("mediciones_brutas" "estados_medicion" "eventos_actuadores")
+TABLES=("mediciones_brutas" "estados_medicion" "eventos_actuadores" "incidencias_medicion")
 TABLE_ERRORS=0
 for T in "${TABLES[@]}"; do
   EXISTS=$(docker exec "$MYSQL_CONTAINER" mysql -u root -p"$MYSQL_ROOT_PWD" "$MYSQL_DB" -N -e "SHOW TABLES LIKE '$T';" 2>/dev/null | grep -c "$T" || true)
@@ -132,10 +132,14 @@ fi
 
 echo
 echo "8. Ultimos registros consolidados (vista)..."
-docker exec "$MYSQL_CONTAINER" mysql -u root -p"$MYSQL_ROOT_PWD" "$MYSQL_DB" -e "SELECT id, device_id, habitacion, contexto_hotel, estado_riesgo, nivel_alerta, timestamp_origen FROM vw_mediciones_estado ORDER BY id DESC LIMIT 5;" 2>/dev/null || echo "No se pudieron obtener registros"
+docker exec "$MYSQL_CONTAINER" mysql -u root -p"$MYSQL_ROOT_PWD" "$MYSQL_DB" -e "SELECT id, device_id, habitacion, contexto_hotel, tiene_problema, estado_calidad, estado_riesgo, nivel_alerta, timestamp_origen FROM vw_mediciones_estado ORDER BY id DESC LIMIT 5;" 2>/dev/null || echo "No se pudieron obtener registros"
 
 echo
-echo "9. Resumen"
+echo "9. Ultimas incidencias de calidad..."
+docker exec "$MYSQL_CONTAINER" mysql -u root -p"$MYSQL_ROOT_PWD" "$MYSQL_DB" -e "SELECT id, medicion_id, device_id, habitacion, tipo_incidencia, detalle_incidencia, created_at FROM vw_incidencias_medicion ORDER BY id DESC LIMIT 5;" 2>/dev/null || echo "No se pudieron obtener incidencias"
+
+echo
+echo "10. Resumen"
 echo "=============================================="
 echo "Node-RED UI:     http://localhost:1880"
 echo "MySQL (host):    localhost:${MYSQL_PORT:-3306}"
