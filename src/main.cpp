@@ -18,9 +18,9 @@
 // ==========================================
 // 2. FRECUENCIA DE ENVÍO DE TELEMETRÍA (RAW)
 // ==========================================
-const unsigned long INTERVALO_ENVIO_DEFAULT_MS = 15000;
-const unsigned long INTERVALO_ENVIO_MIN_MS = 1000;
-const unsigned long INTERVALO_ENVIO_MAX_MS = 60000;
+const unsigned long INTERVALO_ENVIO_DEFAULT_MS = INTERVALO_ENVIO_DEFAULT;
+const unsigned long INTERVALO_ENVIO_MIN_MS = INTERVALO_ENVIO_MIN;
+const unsigned long INTERVALO_ENVIO_MAX_MS = INTERVALO_ENVIO_MAX;
 unsigned long intervaloEnvioMs = INTERVALO_ENVIO_DEFAULT_MS;
 
 // Variable global que guarda el contexto del sistema externo
@@ -36,6 +36,8 @@ const int mqtt_port = MQTT_PORT;
 const char* mqtt_user = MQTT_USER;
 const char* mqtt_pass = MQTT_PASS;
 const char* topico_datos = TOPICO_DATOS;
+const char* device_id = DEVICE_ID;
+const char* habitacion = HABITACION;
 const char* topico_comandos = TOPICO_COMANDOS;
 bool sistemaActivo = true;
 
@@ -102,6 +104,14 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
   if (error) {
     Serial.println("ERROR: Error al parsear JSON de comando");
+    return;
+  }
+
+  String targetDevice = docCmd["device_id"] | "";
+  targetDevice.trim();
+  if (targetDevice.length() > 0 && targetDevice != device_id) {
+    Serial.print("Comando ignorado para device_id: ");
+    Serial.println(targetDevice);
     return;
   }
 
@@ -243,14 +253,7 @@ void loop() {
   float temperature = dhtReading.temperature;
 
   bool motion = (movimiento == HIGH);
-  const char* event = nullptr;
-  if (motion && pirState == LOW) {
-    event    = "movimiento_iniciado";
-    pirState = HIGH;
-  } else if (!motion && pirState == HIGH) {
-    event    = "movimiento_detenido";
-    pirState = LOW;
-  }
+  pirState = motion ? HIGH : LOW;
 
   // ==========================================
   // 5. CREAR Y ENVIAR JSON (RAW, sin lógica de riesgo)
@@ -258,21 +261,15 @@ void loop() {
   JsonDocument doc;
   String timestamp = getUtcOffsetIsoTimestamp();
   doc["timestamp"] = timestamp;
-  doc["device_id"] = "ESP32-HW-01";
-  doc["habitacion"] = "HTL-N-P1-103";
+  doc["device_id"] = device_id;
+  doc["habitacion"] = habitacion;
   doc["contexto_hotel"] = estadoHabitacion;
-  doc["sistema_activo"] = sistemaActivo;
   doc["intervalo_envio_ms"] = intervaloEnvioMs;
   doc["fosfina_mq135"] = sensorMQ135;
   doc["co_mq7"] = sensorMQ7;
   doc["presencia_pir"] = motion;
-  if (event) doc["evento_pir"] = event;
 
-  if (dht11.getStatus() != DHTesp::ERROR_NONE || isnan(humidity) || isnan(temperature)) {
-    doc["error"] = String("Fallo lectura DHT11: ") + dht11.getStatusString();
-    doc["dht_ok"] = false;
-  } else {
-    doc["dht_ok"] = true;
+  if (dht11.getStatus() == DHTesp::ERROR_NONE && !isnan(humidity) && !isnan(temperature)) {
     doc["temperatura_C"] = temperature;
     doc["humedad_pct"] = humidity;
   }
@@ -311,7 +308,7 @@ void reconnect() {
       Serial.println(" ¡Conectado al Bróker MQTT!");
       bool subscribed = mqttClient.subscribe(topico_comandos);
       if (subscribed) {
-        Serial.println("Escuchando comandos en: " + String(topico_comandos));
+        Serial.println(String("Escuchando comandos en: ") + topico_comandos);
       } else {
         Serial.println("Fallo suscripcion al topico de comandos");
       }

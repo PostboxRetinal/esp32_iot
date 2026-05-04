@@ -56,12 +56,9 @@ Incluye campos compatibles con el flujo del proyecto:
 - `habitacion`
 - `contexto_hotel`
 - `timestamp`
-- `sistema_activo`
 - `intervalo_envio_ms`
 - `fosfina_mq135`
 - `co_mq7`
 - `presencia_pir`
-- `evento_pir` (opcional)
-- `dht_ok`
-- `temperatura_C` y `humedad_pct` (si `dht_ok=true`)
-- `error` (si `dht_ok=false`)
+- `temperatura_C`
+- `humedad_pct`

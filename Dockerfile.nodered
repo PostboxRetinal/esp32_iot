@@ -7,4 +7,4 @@ RUN npm install --no-audit --no-fund --unsafe-perm node-red-node-mysql
 
 COPY --chmod=755 docker/node-red/bootstrap.sh /usr/src/node-red/bootstrap.sh
 
-ENTRYPOINT ["/usr/src/node-red/bootstrap.sh"]
+ENTRYPOINT ["/bin/sh", "/usr/src/node-red/bootstrap.sh"]
