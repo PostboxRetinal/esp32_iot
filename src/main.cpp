@@ -9,11 +9,11 @@
 // ==========================================
 // 1. ASIGNACIÓN DE PINES
 // ==========================================
-#define DHT11_PIN           26
-#define MQ135_ANALOG_PIN    34
-#define MQ7_ANALOG_PIN      35
-#define PIR_DIGITAL_PIN     25
-#define LED_INTEGRADO       2
+#define DHT11_PIN 26
+#define MQ135_ANALOG_PIN 34
+#define MQ7_ANALOG_PIN 35
+#define PIR_DIGITAL_PIN 25
+#define LED_INTEGRADO 2
 
 // ==========================================
 // 2. FRECUENCIA DE ENVÍO DE TELEMETRÍA (RAW)
@@ -29,17 +29,16 @@ String estadoHabitacion = "LIBRE"; // Estados posibles: "LIBRE", "RESERVADA", "F
 // ==========================================
 // 3. CREDENCIALES Y RED
 // ==========================================
-const char* ssid = WIFI_SSID;
-const char* password = WIFI_PASSWORD;
-const char* mqtt_server = MQTT_SERVER;
+const char *ssid = WIFI_SSID;
+const char *password = WIFI_PASSWORD;
+const char *mqtt_server = MQTT_SERVER;
 const int mqtt_port = MQTT_PORT;
-const char* mqtt_user = MQTT_USER;
-const char* mqtt_pass = MQTT_PASS;
-const char* topico_datos = TOPICO_DATOS;
-const char* device_id = DEVICE_ID;
-const char* habitacion = HABITACION;
-const char* topico_comandos = TOPICO_COMANDOS;
-bool sistemaActivo = true;
+const char *mqtt_user = MQTT_USER;
+const char *mqtt_pass = MQTT_PASS;
+const char *topico_datos = TOPICO_DATOS;
+const char *device_id = DEVICE_ID;
+const char *habitacion = HABITACION;
+const char *topico_comandos = TOPICO_COMANDOS;
 
 // Variables de estado de sensores
 int sensorMQ135;
@@ -54,20 +53,24 @@ PubSubClient mqttClient(espClient);
 void reconnect();
 void setup_wifi();
 
-const long GMT_OFFSET_SEC = -5 * 3600;  // UTC-5
+const long GMT_OFFSET_SEC = -5 * 3600; // UTC-5
 const int DAYLIGHT_OFFSET_SEC = 0;
 
-bool ensureNtpTime() {
+bool ensureNtpTime()
+{
   struct tm timeinfo;
-  if (!getLocalTime(&timeinfo, 10000)) {
+  if (!getLocalTime(&timeinfo, 10000))
+  {
     return false;
   }
   return (timeinfo.tm_year > 110);
 }
 
-String getUtcOffsetIsoTimestamp() {
+String getUtcOffsetIsoTimestamp()
+{
   struct tm timeinfo;
-  if (!getLocalTime(&timeinfo)) {
+  if (!getLocalTime(&timeinfo))
+  {
     return String("unsynced-") + String(millis());
   }
   char buf[25];
@@ -75,8 +78,10 @@ String getUtcOffsetIsoTimestamp() {
   return String(buf);
 }
 
-void parpadearLedFeedback(int veces = 2, int onMs = 100, int offMs = 100) {
-  for (int i = 0; i < veces; i++) {
+void parpadearLedFeedback(int veces = 2, int onMs = 100, int offMs = 100)
+{
+  for (int i = 0; i < veces; i++)
+  {
     digitalWrite(LED_INTEGRADO, HIGH);
     delay(onMs);
     digitalWrite(LED_INTEGRADO, LOW);
@@ -88,12 +93,14 @@ void parpadearLedFeedback(int veces = 2, int onMs = 100, int offMs = 100) {
 // 4. CALLBACK: ESCUCHA DEL SISTEMA EXTERNO
 // ==========================================
 // Aquí es donde la ESP32 recibe la orden de la "Recepcionista" o "App Externa"
-void callback(char* topic, byte* payload, unsigned int length) {
+void callback(char *topic, byte *payload, unsigned int length)
+{
   String mensaje = "";
-  for (int i = 0; i < length; i++) {
+  for (int i = 0; i < length; i++)
+  {
     mensaje += (char)payload[i];
   }
-  
+
   Serial.print("Comando recibido: ");
   Serial.println(mensaje);
 
@@ -102,14 +109,16 @@ void callback(char* topic, byte* payload, unsigned int length) {
   JsonDocument docCmd;
   DeserializationError error = deserializeJson(docCmd, mensaje);
 
-  if (error) {
+  if (error)
+  {
     Serial.println("ERROR: Error al parsear JSON de comando");
     return;
   }
 
   String targetDevice = docCmd["device_id"] | "";
   targetDevice.trim();
-  if (targetDevice.length() > 0 && targetDevice != device_id) {
+  if (targetDevice.length() > 0 && targetDevice != device_id)
+  {
     Serial.print("Comando ignorado para device_id: ");
     Serial.println(targetDevice);
     return;
@@ -117,29 +126,23 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
   bool procesado = false;
 
-  String comando = docCmd["msg"] | "";
-  if (comando == "PAUSA") {
-    sistemaActivo = false;
-    Serial.println("SISTEMA PAUSADO");
-    procesado = true;
-  }
-  if (comando == "INICIAR") {
-    sistemaActivo = true;
-    Serial.println("SISTEMA INICIADO");
-    procesado = true;
-  }
-
   long nuevoIntervaloMs = -1;
-  if (!docCmd["sample_interval_ms"].isNull()) {
+  if (!docCmd["sample_interval_ms"].isNull())
+  {
     nuevoIntervaloMs = docCmd["sample_interval_ms"].as<long>();
-  } else if (!docCmd["intervalo_ms"].isNull()) {
+  }
+  else if (!docCmd["intervalo_ms"].isNull())
+  {
     nuevoIntervaloMs = docCmd["intervalo_ms"].as<long>();
   }
 
-  if (nuevoIntervaloMs > 0) {
+  if (nuevoIntervaloMs > 0)
+  {
     unsigned long clamped = (unsigned long)nuevoIntervaloMs;
-    if (clamped < INTERVALO_ENVIO_MIN_MS) clamped = INTERVALO_ENVIO_MIN_MS;
-    if (clamped > INTERVALO_ENVIO_MAX_MS) clamped = INTERVALO_ENVIO_MAX_MS;
+    if (clamped < INTERVALO_ENVIO_MIN_MS)
+      clamped = INTERVALO_ENVIO_MIN_MS;
+    if (clamped > INTERVALO_ENVIO_MAX_MS)
+      clamped = INTERVALO_ENVIO_MAX_MS;
 
     intervaloEnvioMs = clamped;
     Serial.print("Frecuencia de muestreo actualizada a: ");
@@ -149,22 +152,26 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
 
   String nuevoEstado = docCmd["estado"] | "";
-  if (nuevoEstado == "LIBRE" || nuevoEstado == "RESERVADA" || nuevoEstado == "FUMIGACION") {
+  if (nuevoEstado == "LIBRE" || nuevoEstado == "RESERVADA" || nuevoEstado == "FUMIGACION")
+  {
     estadoHabitacion = nuevoEstado;
     Serial.println("Contexto de habitacion actualizado a: " + estadoHabitacion);
     procesado = true;
   }
 
-  if (!procesado) {
+  if (!procesado)
+  {
     Serial.println("ERROR: Comando/estado desconocido. Ignorando...");
   }
 }
 
-void setup_wifi() {
+void setup_wifi()
+{
   Serial.print("\nConectando a Wi-Fi: ");
   Serial.println(ssid);
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED)
+  {
     delay(500);
     Serial.print(".");
   }
@@ -175,15 +182,19 @@ void setup_wifi() {
 
   struct tm timeinfo;
   int retries = 0;
-  while (!getLocalTime(&timeinfo) && retries < 20) {
+  while (!getLocalTime(&timeinfo) && retries < 20)
+  {
     delay(500);
     Serial.print(".");
     retries++;
   }
 
-  if (retries < 20) {
+  if (retries < 20)
+  {
     Serial.println("\n¡Hora sincronizada!");
-  } else {
+  }
+  else
+  {
     Serial.println("\nNo se logró sincronizar NTP, se usará timestamp de respaldo.");
   }
 }
@@ -191,7 +202,8 @@ void setup_wifi() {
 // ==========================================
 // SETUP
 // ==========================================
-void setup() {
+void setup()
+{
   Serial.begin(115200);
   pinMode(MQ135_ANALOG_PIN, INPUT);
   pinMode(MQ7_ANALOG_PIN, INPUT);
@@ -208,46 +220,45 @@ void setup() {
   mqttClient.setKeepAlive(60);
   mqttClient.setSocketTimeout(15);
 
-  Serial.print("MQTT broker: "); 
+  Serial.print("MQTT broker: ");
   Serial.print(mqtt_server);
-  Serial.print(":"); 
+  Serial.print(":");
   Serial.println(mqtt_port);
-  Serial.print("Alertas: "); 
+  Serial.print("Alertas: ");
   Serial.println(topico_datos);
-  Serial.print("Comandos: "); 
+  Serial.print("Comandos: ");
   Serial.println(topico_comandos);
 }
 
 // ==========================================
 // LOOP PRINCIPAL
 // ==========================================
-void loop() {
+void loop()
+{
   // 1. Mantener WiFi
-  if (WiFi.status() != WL_CONNECTED) {
+  if (WiFi.status() != WL_CONNECTED)
+  {
     setup_wifi();
   }
 
   // 2. Mantener MQTT y procesar comandos entrantes
-  if (!mqttClient.connected()) {
+  if (!mqttClient.connected())
+  {
     reconnect();
   }
   mqttClient.loop();
 
-  if (!sistemaActivo) {
-    delay(100);
-    return;
-  }
-
   // 3. Temporizador NO bloqueante (intervalo fijo)
   static unsigned long lastReadMs = 0;
-  if (millis() - lastReadMs < intervaloEnvioMs) return;
+  if (millis() - lastReadMs < intervaloEnvioMs)
+    return;
   lastReadMs = millis();
 
   // 4. Leer sensores
   sensorMQ135 = analogRead(MQ135_ANALOG_PIN);
   delayMicroseconds(10);
-  sensorMQ7   = analogRead(MQ7_ANALOG_PIN);
-  movimiento  = digitalRead(PIR_DIGITAL_PIN);
+  sensorMQ7 = analogRead(MQ7_ANALOG_PIN);
+  movimiento = digitalRead(PIR_DIGITAL_PIN);
   TempAndHumidity dhtReading = dht11.getTempAndHumidity();
   float humidity = dhtReading.humidity;
   float temperature = dhtReading.temperature;
@@ -269,7 +280,8 @@ void loop() {
   doc["co_mq7"] = sensorMQ7;
   doc["presencia_pir"] = motion;
 
-  if (dht11.getStatus() == DHTesp::ERROR_NONE && !isnan(humidity) && !isnan(temperature)) {
+  if (dht11.getStatus() == DHTesp::ERROR_NONE && !isnan(humidity) && !isnan(temperature))
+  {
     doc["temperatura_C"] = temperature;
     doc["humedad_pct"] = humidity;
   }
@@ -277,16 +289,22 @@ void loop() {
   char outBuf[512];
   size_t outLen = serializeJsonPretty(doc, outBuf, sizeof(outBuf));
 
-  if (!mqttClient.connected()) {
+  if (!mqttClient.connected())
+  {
     Serial.println("ERROR: MQTT no conectado al publicar, reintentando reconexión...");
     reconnect();
-  } else {
+  }
+  else
+  {
     bool published = mqttClient.publish(topico_datos, outBuf, outLen);
-    if (!published) {
+    if (!published)
+    {
       Serial.print("ERROR: MQTT publish retornó false, state=");
       Serial.println(mqttClient.state());
       reconnect();
-    } else {
+    }
+    else
+    {
       Serial.print("Publicado en ");
       Serial.println(topico_datos);
     }
@@ -299,20 +317,28 @@ void loop() {
 // ==========================================
 // FUNCIÓN DE RECONEXIÓN MQTT
 // ==========================================
-void reconnect() {
-  while (!mqttClient.connected() && WiFi.status() == WL_CONNECTED) {
+void reconnect()
+{
+  while (!mqttClient.connected() && WiFi.status() == WL_CONNECTED)
+  {
     Serial.print("Conectando a Maqiatto...");
     String clientId = "HotelESP32-" + String((uint32_t)esp_random(), HEX);
 
-    if (mqttClient.connect(clientId.c_str(), mqtt_user, mqtt_pass)) {
+    if (mqttClient.connect(clientId.c_str(), mqtt_user, mqtt_pass))
+    {
       Serial.println(" ¡Conectado al Bróker MQTT!");
       bool subscribed = mqttClient.subscribe(topico_comandos);
-      if (subscribed) {
+      if (subscribed)
+      {
         Serial.println(String("Escuchando comandos en: ") + topico_comandos);
-      } else {
+      }
+      else
+      {
         Serial.println("Fallo suscripcion al topico de comandos");
       }
-    } else {
+    }
+    else
+    {
       Serial.print(" Falló, rc=");
       Serial.print(mqttClient.state());
       Serial.println(". Reintentando en 2s...");
