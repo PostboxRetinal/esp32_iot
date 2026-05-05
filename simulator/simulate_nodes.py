@@ -19,9 +19,14 @@ INTERVAL_SECONDS = max(float(os.getenv("SIM_INTERVAL_SECONDS", "7")), 1.0)
 DEVICE_ID = os.getenv("SIM_DEVICE_ID", os.getenv("HOSTNAME", "SIM-NODO")).strip() or "SIM-NODO"
 HABITACION = os.getenv("SIM_HABITACION", f"SIM-{DEVICE_ID}").strip() or f"SIM-{DEVICE_ID}"
 CONTEXTO_INICIAL = os.getenv("SIM_CONTEXTO_HOTEL", "LIBRE").strip().upper()
-SISTEMA_INICIAL = os.getenv("SIM_SISTEMA_ACTIVO", "true").strip().lower() in {"1", "true", "on", "si", "yes"}
 ALERT_PROB = float(os.getenv("SIM_ALERT_PROB", "0.22"))
 MOTION_PROB = float(os.getenv("SIM_MOTION_PROB", "0.3"))
+DHT_FAIL_PROB = float(os.getenv("SIM_DHT_FAIL_PROB", "0.05"))
+MISSING_PROB = float(os.getenv("SIM_MISSING_PROB", "0.05"))
+OUTLIER_PROB = float(os.getenv("SIM_OUTLIER_PROB", "0.04"))
+DUP_PROB = float(os.getenv("SIM_DUP_PROB", "0.02"))
+GAP_PROB = float(os.getenv("SIM_GAP_PROB", "0.01"))
+GAP_SECONDS = float(os.getenv("SIM_GAP_SECONDS", "35"))
 
 VALID_CONTEXTOS = {"LIBRE", "RESERVADA", "FUMIGACION"}
 MIN_INTERVAL_MS = 1000
@@ -29,10 +34,10 @@ MAX_INTERVAL_MS = 60000
 
 state_lock = threading.Lock()
 state = {
-    "activo": SISTEMA_INICIAL,
     "intervalo_envio_ms": int(INTERVAL_SECONDS * 1000),
     "contexto_hotel": CONTEXTO_INICIAL if CONTEXTO_INICIAL in VALID_CONTEXTOS else "LIBRE",
     "pir_prev": False,
+    "last_payload": None,
 }
 
 
@@ -47,7 +52,6 @@ def clamp_interval_ms(v: int) -> int:
 def snapshot_state() -> dict:
     with state_lock:
         return {
-            "activo": bool(state["activo"]),
             "intervalo_envio_ms": int(state["intervalo_envio_ms"]),
             "contexto_hotel": str(state["contexto_hotel"]),
             "pir_prev": bool(state["pir_prev"]),
@@ -75,16 +79,6 @@ def on_message(_client, _userdata, msg):
         return
 
     changed = []
-
-    cmd = str(command.get("msg") or "").strip().upper()
-    if cmd == "PAUSA":
-        with state_lock:
-            state["activo"] = False
-        changed.append("activo=false")
-    elif cmd == "INICIAR":
-        with state_lock:
-            state["activo"] = True
-        changed.append("activo=true")
 
     intervalo = command.get("sample_interval_ms", command.get("intervalo_ms"))
     if intervalo is not None:
@@ -130,10 +124,24 @@ def build_payload() -> dict:
         "fosfina_mq135": mq135,
         "co_mq7": mq7,
         "presencia_pir": motion,
+        "temperatura_C": round(temp, 2),
+        "humedad_pct": round(35 + random.random() * 40, 2),
     }
 
-    payload["temperatura_C"] = round(temp, 2)
-    payload["humedad_pct"] = round(35 + random.random() * 40, 2)
+    if random.random() < DHT_FAIL_PROB:
+        payload.pop("temperatura_C", None)
+        payload.pop("humedad_pct", None)
+        payload["dht_ok"] = False
+
+    if random.random() < MISSING_PROB:
+        missing_field = random.choice(["temperatura_C", "humedad_pct", "fosfina_mq135", "co_mq7"])
+        payload.pop(missing_field, None)
+
+    if random.random() < OUTLIER_PROB:
+        payload["temperatura_C"] = 120.0
+        payload["humedad_pct"] = 150.0
+        payload["fosfina_mq135"] = 9999
+        payload["co_mq7"] = 9999
 
     return payload
 
@@ -158,15 +166,23 @@ def main() -> None:
 
     try:
         while True:
-            s = snapshot_state()
-            if s["activo"]:
+            payload = None
+            if random.random() < DUP_PROB:
+                with state_lock:
+                    payload = state.get("last_payload")
+
+            if payload is None:
                 payload = build_payload()
-                body = json.dumps(payload, ensure_ascii=True)
-                result = client.publish(TOPICO_DATOS, body, qos=QOS, retain=False)
-                result.wait_for_publish()
-                print(f"[{payload['device_id']}] -> {body}")
-            else:
-                print(f"[{DEVICE_ID}] sistema en PAUSA, sin envio")
+                with state_lock:
+                    state["last_payload"] = dict(payload)
+
+            body = json.dumps(payload, ensure_ascii=True)
+            result = client.publish(TOPICO_DATOS, body, qos=QOS, retain=False)
+            result.wait_for_publish()
+            print(f"[{payload['device_id']}] -> {body}")
+
+            if random.random() < GAP_PROB:
+                time.sleep(max(GAP_SECONDS, 1.0))
 
             time.sleep(max(snapshot_state()["intervalo_envio_ms"] / 1000.0, 1.0))
     except KeyboardInterrupt:

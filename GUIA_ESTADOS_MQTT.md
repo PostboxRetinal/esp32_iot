@@ -2,7 +2,6 @@
 
 Esta guia explica como controlar por broker MQTT:
 - contexto de habitacion (`LIBRE`, `RESERVADA`, `FUMIGACION`),
-- estado del ciclo (`INICIAR`, `PAUSA`),
 - frecuencia de envio (`sample_interval_ms`),
 - pruebas de PIR y validacion de que el cambio realmente se aplico.
 
@@ -26,21 +25,23 @@ Esta guia explica como controlar por broker MQTT:
 
 ## 3) Campos JSON que entiende el sistema
 
-Comando minimo:
+Comando minimo (ESP32):
 
 ```json
 {
-  "msg": "INICIAR",
   "estado": "LIBRE"
 }
 ```
 
 Campos disponibles:
-- `msg`: `INICIAR` o `PAUSA`
 - `estado`: `LIBRE`, `RESERVADA`, `FUMIGACION`
 - `sample_interval_ms`: frecuencia de envio en ms
 - `intervalo_ms`: alias compatible para frecuencia
-- `device_id`: obligatorio para identificar el nodo destino dentro del payload
+- `device_id`: opcional (si viene y no coincide, el comando se ignora)
+
+Notas:
+- `estado` debe venir en mayusculas para ser aceptado.
+- Los comandos solo usan `estado` y `sample_interval_ms` (o `intervalo_ms`).
 
 Rangos:
 - intervalo minimo: `1000` ms
@@ -51,7 +52,7 @@ Rangos:
 1. Verifica variables en `.env`:
    - `MQTT_SERVER`, `MQTT_PORT`, `MQTT_USER`, `MQTT_PASS`
    - `TOPICO_DATOS`, `TOPICO_COMANDOS`
-  - `DEVICE_ID` si vas a probar los ejemplos de shell con tu nodo local
+  - `DEVICE_ID` si vas a probar los ejemplos con el ESP32
 2. Levanta servicios:
    - `docker compose up --build -d`
 3. Verifica backend:
@@ -73,35 +74,30 @@ Rangos:
 ### Opcion A: `mosquitto_pub` local
 
 ```bash
-mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"msg":"INICIAR","estado":"LIBRE","sample_interval_ms":15000,"device_id":"ESP32-HW-01"}' -q 1
+mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"estado":"LIBRE","sample_interval_ms":15000,"device_id":"ESP32-HW-01"}' -q 1
 ```
 
 ### Opcion B: sin instalar nada (usando Docker)
 
 ```bash
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"msg":"INICIAR","estado":"LIBRE","sample_interval_ms":15000,"device_id":"ESP32-HW-01"}' -q 1
+docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"estado":"LIBRE","sample_interval_ms":15000,"device_id":"ESP32-HW-01"}' -q 1
 ```
 
 Comandos tipicos:
 
 ```bash
 # Cambiar a RESERVADA
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"msg":"INICIAR","estado":"RESERVADA","sample_interval_ms":15000,"device_id":"ESP32-HW-01"}' -q 1
+docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"estado":"RESERVADA","sample_interval_ms":15000,"device_id":"ESP32-HW-01"}' -q 1
 
 # Cambiar a FUMIGACION
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"msg":"INICIAR","estado":"FUMIGACION","sample_interval_ms":7000,"device_id":"ESP32-HW-01"}' -q 1
+docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"estado":"FUMIGACION","sample_interval_ms":7000,"device_id":"ESP32-HW-01"}' -q 1
 
-# Pausar envio
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"msg":"PAUSA","device_id":"ESP32-HW-01"}' -q 1
-
-# Reanudar envio
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"msg":"INICIAR","device_id":"ESP32-HW-01"}' -q 1
 ```
 
 Comando dirigido a un simulador especifico:
 
 ```bash
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"msg":"INICIAR","estado":"LIBRE","device_id":"SIM-NODO-01"}' -q 1
+docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"estado":"LIBRE","device_id":"SIM-NODO-01"}' -q 1
 ```
 
 ## 7) PIR: que se puede comandar y que no
@@ -142,18 +138,16 @@ Validacion 3: MySQL
 
 El sistema ya no descarta una medicion con problemas de calidad. La estrategia es:
 
-- `mediciones_brutas` conserva el registro original con `tiene_problema`, `estado_calidad`, `motivo_calidad` y `firma_medicion`.
-- `incidencias_medicion` guarda el detalle del problema detectado, por ejemplo duplicados, datos incompletos o huecos temporales.
-- Si llega una medicion repetida, se almacena en bruto y ademas queda marcada como incidencia para no perder trazabilidad.
-- `vw_mediciones_estado` permite ver en una sola consulta el dato bruto, el estado calculado y la calidad del registro.
+- `mediciones_brutas` conserva el registro original y el flag `limpio` (0/1).
+- `mediciones_limpias` guarda los registros corregidos o imputados.
+- `incidencias` guarda el detalle del problema detectado (duplicados, incompletos, temporales, formato, atipicos).
+- `vw_mediciones_estado` muestra mediciones con su estado de riesgo.
 - Los injects de Node-RED para `RESUMEN_CALIDAD` e `INCIDENCIAS_RECIENTES` sirven para demostrar el analisis en clase.
 
 ## 9) Errores comunes
 
 - Estado no cambia:
   - `estado` debe ser exactamente `LIBRE`, `RESERVADA` o `FUMIGACION`.
-- Se pausa y no vuelve a enviar:
-  - enviar `{ "msg": "INICIAR" }`.
 - Comando parece correcto y no surte efecto:
   - revisar `TOPICO_COMANDOS` y credenciales del broker.
 - Simulador no toma comando dirigido:
