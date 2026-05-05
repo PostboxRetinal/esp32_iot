@@ -136,7 +136,7 @@ docker exec "$MYSQL_CONTAINER" mysql -u root -p"$MYSQL_ROOT_PWD" "$MYSQL_DB" -e 
 
 echo
 echo "9. Ultimas incidencias de calidad..."
-docker exec "$MYSQL_CONTAINER" mysql -u root -p"$MYSQL_ROOT_PWD" "$MYSQL_DB" -e "SELECT id, medicion_id, id_habitacion, tipo_incidencia, detalle_incidencia, created_at FROM vw_incidencias_medicion ORDER BY id DESC LIMIT 5;" 2>/dev/null || echo "No se pudieron obtener incidencias"
+docker exec "$MYSQL_CONTAINER" mysql -u root -p"$MYSQL_ROOT_PWD" "$MYSQL_DB" -e "SELECT id, medicion_id, id_habitacion, tipo_incidencia, detalle_incidencia, incidencia_created_at FROM vw_incidencias_medicion ORDER BY id DESC LIMIT 5;" 2>/dev/null || echo "No se pudieron obtener incidencias"
 
 echo
 echo "10. Verificando ceros en mediciones_limpias..."
