@@ -12,8 +12,7 @@
 #define MQTT_PASS      "PASS_MQTT"
 
 // Node identity
-#define DEVICE_ID      "ESP32-HW-01"
-#define HABITACION     "HTL-N-P1-103"
+#define ID_HABITACION  "HTL-N-P1-103"
 
 // Topics
 #define TOPICO_DATOS   "USUARIO_MQTT/datos"

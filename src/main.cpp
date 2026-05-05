@@ -36,8 +36,7 @@ const int mqtt_port = MQTT_PORT;
 const char *mqtt_user = MQTT_USER;
 const char *mqtt_pass = MQTT_PASS;
 const char *topico_datos = TOPICO_DATOS;
-const char *device_id = DEVICE_ID;
-const char *habitacion = HABITACION;
+const char *id_habitacion = ID_HABITACION;
 const char *topico_comandos = TOPICO_COMANDOS;
 
 // Variables de estado de sensores
@@ -115,12 +114,12 @@ void callback(char *topic, byte *payload, unsigned int length)
     return;
   }
 
-  String targetDevice = docCmd["device_id"] | "";
-  targetDevice.trim();
-  if (targetDevice.length() > 0 && targetDevice != device_id)
+  String targetRoom = docCmd["id_habitacion"] | "";
+  targetRoom.trim();
+  if (targetRoom.length() > 0 && targetRoom != id_habitacion)
   {
-    Serial.print("Comando ignorado para device_id: ");
-    Serial.println(targetDevice);
+    Serial.print("Comando ignorado para id_habitacion: ");
+    Serial.println(targetRoom);
     return;
   }
 
@@ -272,8 +271,7 @@ void loop()
   JsonDocument doc;
   String timestamp = getUtcOffsetIsoTimestamp();
   doc["timestamp"] = timestamp;
-  doc["device_id"] = device_id;
-  doc["habitacion"] = habitacion;
+  doc["id_habitacion"] = id_habitacion;
   doc["contexto_hotel"] = estadoHabitacion;
   doc["intervalo_envio_ms"] = intervaloEnvioMs;
   doc["fosfina_mq135"] = sensorMQ135;

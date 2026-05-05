@@ -6,6 +6,7 @@ DROP VIEW IF EXISTS vw_mediciones_estado;
 DROP PROCEDURE IF EXISTS sp_limpiar_datos_iot;
 
 DROP TABLE IF EXISTS sensores;
+DROP TABLE IF EXISTS analisis_mediciones;
 DROP TABLE IF EXISTS eventos_actuadores;
 DROP TABLE IF EXISTS estados_medicion;
 DROP TABLE IF EXISTS incidencias;
@@ -14,8 +15,7 @@ DROP TABLE IF EXISTS mediciones_brutas;
 
 CREATE TABLE IF NOT EXISTS mediciones_brutas (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  device_id VARCHAR(100) NOT NULL,
-  habitacion VARCHAR(120) NOT NULL,
+  id_habitacion VARCHAR(120) NOT NULL,
   contexto_hotel VARCHAR(32) NOT NULL,
   temperatura_c DECIMAL(6,2) NULL,
   humedad_pct DECIMAL(6,2) NULL,
@@ -27,8 +27,7 @@ CREATE TABLE IF NOT EXISTS mediciones_brutas (
   limpio TINYINT(1) NOT NULL DEFAULT 0,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  INDEX idx_med_device_id (device_id),
-  INDEX idx_med_habitacion (habitacion),
+  INDEX idx_med_id_habitacion (id_habitacion),
   INDEX idx_med_contexto (contexto_hotel),
   INDEX idx_med_timestamp_origen (timestamp_origen),
   INDEX idx_med_created_at (created_at),
@@ -56,15 +55,14 @@ CREATE TABLE IF NOT EXISTS mediciones_limpias (
 CREATE TABLE IF NOT EXISTS incidencias (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   medicion_id BIGINT UNSIGNED NOT NULL,
-  device_id VARCHAR(100) NOT NULL,
-  habitacion VARCHAR(120) NOT NULL,
+  id_habitacion VARCHAR(120) NOT NULL,
   tipo_incidencia VARCHAR(20) NOT NULL,
   detalle_incidencia VARCHAR(255) NOT NULL,
   valor_detectado JSON NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   INDEX idx_inc_medicion (medicion_id),
-  INDEX idx_inc_device_id (device_id),
+  INDEX idx_inc_id_habitacion (id_habitacion),
   INDEX idx_inc_tipo (tipo_incidencia),
   INDEX idx_inc_created_at (created_at),
   CONSTRAINT fk_incidencias_medicion
@@ -95,8 +93,7 @@ CREATE TABLE IF NOT EXISTS estados_medicion (
 CREATE TABLE IF NOT EXISTS eventos_actuadores (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   medicion_id BIGINT UNSIGNED NULL,
-  device_id VARCHAR(100) NOT NULL,
-  habitacion VARCHAR(120) NOT NULL,
+  id_habitacion VARCHAR(120) NOT NULL,
   estado_riesgo VARCHAR(20) NOT NULL,
   contexto_hotel VARCHAR(32) NOT NULL,
   motivo_activacion VARCHAR(255) NOT NULL,
@@ -104,8 +101,7 @@ CREATE TABLE IF NOT EXISTS eventos_actuadores (
   timestamp_origen DATETIME NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  INDEX idx_evt_device_id (device_id),
-  INDEX idx_evt_habitacion (habitacion),
+  INDEX idx_evt_id_habitacion (id_habitacion),
   INDEX idx_evt_estado (estado_riesgo),
   INDEX idx_evt_created_at (created_at),
   CONSTRAINT fk_eventos_medicion
@@ -120,8 +116,7 @@ CREATE TABLE IF NOT EXISTS eventos_actuadores (
 CREATE VIEW vw_mediciones_estado AS
 SELECT
   m.id,
-  m.device_id,
-  m.habitacion,
+  m.id_habitacion,
   m.contexto_hotel,
   m.temperatura_c,
   m.humedad_pct,
@@ -142,8 +137,7 @@ CREATE VIEW vw_incidencias_medicion AS
 SELECT
   i.id,
   i.medicion_id,
-  i.device_id,
-  i.habitacion,
+  i.id_habitacion,
   i.tipo_incidencia,
   i.detalle_incidencia,
   i.valor_detectado,
@@ -153,9 +147,27 @@ SELECT
 FROM incidencias i
 INNER JOIN mediciones_brutas m ON m.id = i.medicion_id;
 
+CREATE TABLE IF NOT EXISTS analisis_mediciones (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  id_habitacion VARCHAR(50),
+  temp_promedio FLOAT,
+  temp_minima FLOAT,
+  temp_maxima FLOAT,
+  hum_promedio FLOAT,
+  hum_minima FLOAT,
+  hum_maxima FLOAT,
+  temp_fuera_rango INT,
+  hum_fuera_rango INT,
+  total_registros INT,
+  fecha_inicio_analisis DATETIME,
+  fecha_fin_analisis DATETIME,
+  fecha_generacion DATETIME
+);
+
 DELIMITER $$
 CREATE PROCEDURE sp_limpiar_datos_iot()
 BEGIN
+  DELETE FROM analisis_mediciones;
   DELETE FROM eventos_actuadores;
   DELETE FROM estados_medicion;
   DELETE FROM incidencias;

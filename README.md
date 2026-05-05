@@ -12,7 +12,7 @@ El flujo **HTL-IOT-LIMPIEZA** procesa por demanda lotes de 100 registros con `li
 - homogeneidad de formato
 
 Regla de imputacion:
-- 1-2 columnas con error -> imputacion por mediana (por `device_id`)
+- 1-2 columnas con error -> imputacion por mediana (por `id_habitacion`)
 - >2 columnas con error -> se rechaza y se registra en `incidencias`
 
 Variables de entorno relacionadas (ver `.env`):
@@ -27,9 +27,8 @@ Consultas recomendadas (ejecutar en MySQL):
 ```sql
 SELECT COUNT(*) AS faltan_claves
 FROM mediciones_brutas
-WHERE device_id IS NULL OR device_id = ''
-   OR habitacion IS NULL OR habitacion = ''
-   OR timestamp_origen IS NULL;
+WHERE id_habitacion IS NULL OR id_habitacion = ''
+  OR timestamp_origen IS NULL;
 
 SELECT contexto_hotel, COUNT(*) AS total
 FROM mediciones_brutas
@@ -55,12 +54,20 @@ SELECT COUNT(*) AS grupos_duplicados, COALESCE(SUM(dup_count - 1),0) AS filas_du
 FROM (
   SELECT COUNT(*) AS dup_count
   FROM mediciones_brutas
-  GROUP BY device_id, habitacion, contexto_hotel, timestamp_origen,
+  GROUP BY id_habitacion, contexto_hotel, timestamp_origen,
            temperatura_c, humedad_pct, fosfina_mq135, co_mq7,
            presencia_pir, intervalo_envio_ms
   HAVING COUNT(*) > 1
 ) t;
 ```
+
+## Analisis mensual (Node-RED)
+
+En el flujo **HTL-IOT-PROCESAMIENTO** hay un inject **ANALISIS MENSUAL (ULTIMO MES)** que ejecuta un
+`INSERT ... SELECT` y llena la tabla `analisis_mediciones` con:
+- promedios, minimos y maximos de temperatura y humedad,
+- conteo de valores fuera de rango (temp < 18 o > 25; hum < 30 o > 60),
+- total de registros y rango de fechas del ultimo mes.
 
 ## Simulador MQTT
 

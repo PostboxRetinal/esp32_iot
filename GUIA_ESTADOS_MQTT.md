@@ -37,7 +37,7 @@ Campos disponibles:
 - `estado`: `LIBRE`, `RESERVADA`, `FUMIGACION`
 - `sample_interval_ms`: frecuencia de envio en ms
 - `intervalo_ms`: alias compatible para frecuencia
-- `device_id`: opcional (si viene y no coincide, el comando se ignora)
+- `id_habitacion`: opcional (si viene y no coincide, el comando se ignora)
 
 Notas:
 - `estado` debe venir en mayusculas para ser aceptado.
@@ -50,12 +50,12 @@ Rangos:
 ## 4) Preparacion antes de enviar comandos
 
 1. Verifica variables en `.env`:
-   - `MQTT_SERVER`, `MQTT_PORT`, `MQTT_USER`, `MQTT_PASS`
-   - `TOPICO_DATOS`, `TOPICO_COMANDOS`
-  - `DEVICE_ID` si vas a probar los ejemplos con el ESP32
-2. Levanta servicios:
+  - `MQTT_SERVER`, `MQTT_PORT`, `MQTT_USER`, `MQTT_PASS`
+  - `TOPICO_DATOS`, `TOPICO_COMANDOS`
+2. Si vas a probar con ESP32, ajusta `ID_HABITACION` en `include/config.h`.
+3. Levanta servicios:
    - `docker compose up --build -d`
-3. Verifica backend:
+4. Verifica backend:
    - `bash scripts/verify-mysql.sh`
 
 ## 5) Cambiar estados desde Node-RED (sin terminal)
@@ -66,7 +66,7 @@ Rangos:
    - `Contexto RESERVADA`
    - `Contexto FUMIGACION`
 3. Haz click en el boton del inject deseado.
-4. Node-RED publica en `TOPICO_COMANDOS` con `device_id` en el payload.
+4. Node-RED publica en `TOPICO_COMANDOS` con `id_habitacion` en el payload.
 5. El dispositivo aplica el contexto y lo reporta en la siguiente telemetria.
 
 ## 6) Cambiar estados por broker con comando (terminal)
@@ -74,30 +74,30 @@ Rangos:
 ### Opcion A: `mosquitto_pub` local
 
 ```bash
-mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"estado":"LIBRE","sample_interval_ms":15000,"device_id":"ESP32-HW-01"}' -q 1
+mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"estado":"LIBRE","sample_interval_ms":15000,"id_habitacion":"HTL-N-P1-103"}' -q 1
 ```
 
 ### Opcion B: sin instalar nada (usando Docker)
 
 ```bash
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"estado":"LIBRE","sample_interval_ms":15000,"device_id":"ESP32-HW-01"}' -q 1
+docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"estado":"LIBRE","sample_interval_ms":15000,"id_habitacion":"HTL-N-P1-103"}' -q 1
 ```
 
 Comandos tipicos:
 
 ```bash
 # Cambiar a RESERVADA
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"estado":"RESERVADA","sample_interval_ms":15000,"device_id":"ESP32-HW-01"}' -q 1
+docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"estado":"RESERVADA","sample_interval_ms":15000,"id_habitacion":"HTL-N-P1-103"}' -q 1
 
 # Cambiar a FUMIGACION
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"estado":"FUMIGACION","sample_interval_ms":7000,"device_id":"ESP32-HW-01"}' -q 1
+docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"estado":"FUMIGACION","sample_interval_ms":7000,"id_habitacion":"HTL-N-P1-103"}' -q 1
 
 ```
 
 Comando dirigido a un simulador especifico:
 
 ```bash
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"estado":"LIBRE","device_id":"SIM-NODO-01"}' -q 1
+docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"estado":"LIBRE","id_habitacion":"HTL-N-P1-103"}' -q 1
 ```
 
 ## 7) PIR: que se puede comandar y que no
@@ -113,7 +113,7 @@ Simulador:
 Si quieres probar un caso puntual de intruso, puedes inyectar telemetria manual en `TOPICO_DATOS`:
 
 ```bash
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_DATOS" -m '{"device_id":"TEST-PIR-01","habitacion":"HTL-N-P1-103","timestamp":"2026-04-21T12:00:00Z","contexto_hotel":"FUMIGACION","intervalo_envio_ms":7000,"fosfina_mq135":1800,"co_mq7":300,"presencia_pir":true,"temperatura_C":28,"humedad_pct":60}' -q 1
+docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_DATOS" -m '{"id_habitacion":"HTL-N-P1-103","timestamp":"2026-04-21T12:00:00Z","contexto_hotel":"FUMIGACION","intervalo_envio_ms":7000,"fosfina_mq135":1800,"co_mq7":300,"presencia_pir":true,"temperatura_C":28,"humedad_pct":60}' -q 1
 ```
 
 ## 8) Como validar que el cambio si aplico
@@ -151,7 +151,7 @@ El sistema ya no descarta una medicion con problemas de calidad. La estrategia e
 - Comando parece correcto y no surte efecto:
   - revisar `TOPICO_COMANDOS` y credenciales del broker.
 - Simulador no toma comando dirigido:
-  - confirmar `device_id` exacto del simulador (`SIM_DEVICE_ID`).
+  - confirmar `id_habitacion` exacto del simulador (`SIM_ID_HABITACION`).
 
 ## 10) Flujo operativo recomendado
 

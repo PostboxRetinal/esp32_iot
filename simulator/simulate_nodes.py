@@ -16,8 +16,10 @@ TOPICO_DATOS = os.getenv("TOPICO_DATOS", "usuario/alertas")
 TOPICO_COMANDOS = os.getenv("TOPICO_COMANDOS", "usuario/comandos")
 QOS = int(os.getenv("SIM_QOS", "1"))
 INTERVAL_SECONDS = max(float(os.getenv("SIM_INTERVAL_SECONDS", "7")), 1.0)
-DEVICE_ID = os.getenv("SIM_DEVICE_ID", os.getenv("HOSTNAME", "SIM-NODO")).strip() or "SIM-NODO"
-HABITACION = os.getenv("SIM_HABITACION", f"SIM-{DEVICE_ID}").strip() or f"SIM-{DEVICE_ID}"
+ID_HABITACION = os.getenv(
+    "SIM_ID_HABITACION",
+    os.getenv("SIM_HABITACION", os.getenv("HOSTNAME", "SIM-NODO"))
+).strip() or "SIM-NODO"
 CONTEXTO_INICIAL = os.getenv("SIM_CONTEXTO_HOTEL", "LIBRE").strip().upper()
 ALERT_PROB = float(os.getenv("SIM_ALERT_PROB", "0.22"))
 MOTION_PROB = float(os.getenv("SIM_MOTION_PROB", "0.3"))
@@ -74,8 +76,8 @@ def on_message(_client, _userdata, msg):
     if not isinstance(command, dict):
         return
 
-    target = str(command.get("device_id") or "").strip()
-    if target and target != DEVICE_ID:
+    target = str(command.get("id_habitacion") or "").strip()
+    if target and target != ID_HABITACION:
         return
 
     changed = []
@@ -97,7 +99,7 @@ def on_message(_client, _userdata, msg):
         changed.append(f"contexto_hotel={contexto}")
 
     if changed:
-        print(f"Comando aplicado para {DEVICE_ID}: {', '.join(changed)}")
+        print(f"Comando aplicado para {ID_HABITACION}: {', '.join(changed)}")
 
 
 def build_payload() -> dict:
@@ -116,8 +118,7 @@ def build_payload() -> dict:
         state["pir_prev"] = motion
 
     payload = {
-        "device_id": DEVICE_ID,
-        "habitacion": HABITACION,
+        "id_habitacion": ID_HABITACION,
         "contexto_hotel": s["contexto_hotel"],
         "timestamp": iso_now(),
         "intervalo_envio_ms": s["intervalo_envio_ms"],
@@ -150,7 +151,7 @@ def main() -> None:
     with state_lock:
         state["intervalo_envio_ms"] = clamp_interval_ms(state["intervalo_envio_ms"])
 
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"sim-{DEVICE_ID}-{int(time.time())}")
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"sim-{ID_HABITACION}-{int(time.time())}")
     if MQTT_USER:
         client.username_pw_set(MQTT_USER, MQTT_PASS)
 
@@ -162,7 +163,7 @@ def main() -> None:
 
     print(f"Simulador conectado a {MQTT_SERVER}:{MQTT_PORT}")
     print(f"Publicando en topic: {TOPICO_DATOS}")
-    print(f"Nodo simulado: {DEVICE_ID} | Habitacion: {HABITACION}")
+    print(f"Nodo simulado: {ID_HABITACION}")
 
     try:
         while True:
@@ -179,7 +180,7 @@ def main() -> None:
             body = json.dumps(payload, ensure_ascii=True)
             result = client.publish(TOPICO_DATOS, body, qos=QOS, retain=False)
             result.wait_for_publish()
-            print(f"[{payload['device_id']}] -> {body}")
+            print(f"[{payload['id_habitacion']}] -> {body}")
 
             if random.random() < GAP_PROB:
                 time.sleep(max(GAP_SECONDS, 1.0))
