@@ -49,7 +49,15 @@ CREATE TABLE IF NOT EXISTS mediciones_limpias (
   INDEX idx_limpia_medicion (medicion_id),
   CONSTRAINT fk_limpia_medicion
     FOREIGN KEY (medicion_id) REFERENCES mediciones_brutas(id)
-    ON DELETE CASCADE
+    ON DELETE CASCADE,
+  CONSTRAINT chk_limpia_temperatura_no_cero
+    CHECK (temperatura_c IS NULL OR temperatura_c <> 0),
+  CONSTRAINT chk_limpia_humedad_no_cero
+    CHECK (humedad_pct IS NULL OR humedad_pct <> 0),
+  CONSTRAINT chk_limpia_fosfina_no_cero
+    CHECK (fosfina_mq135 IS NULL OR fosfina_mq135 <> 0),
+  CONSTRAINT chk_limpia_co_no_cero
+    CHECK (co_mq7 IS NULL OR co_mq7 <> 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS incidencias (

@@ -14,6 +14,7 @@ El flujo **HTL-IOT-LIMPIEZA** procesa por demanda lotes de 100 registros con `li
 Regla de imputacion:
 - 1-2 columnas con error -> imputacion por mediana (por `id_habitacion`)
 - >2 columnas con error -> se rechaza y se registra en `incidencias`
+- `mediciones_limpias` no acepta valores `0` en columnas medidas; se tratan como atipicos y se imputan solo con medianas no cero.
 
 Variables de entorno relacionadas (ver `.env`):
 - `TEMP_MIN_C`, `TEMP_MAX_C`, `HUM_MIN_PCT`, `HUM_MAX_PCT`
@@ -59,6 +60,10 @@ FROM (
            presencia_pir, intervalo_envio_ms
   HAVING COUNT(*) > 1
 ) t;
+
+SELECT COUNT(*) AS limpias_con_ceros
+FROM mediciones_limpias
+WHERE temperatura_c = 0 OR humedad_pct = 0 OR fosfina_mq135 = 0 OR co_mq7 = 0;
 ```
 
 ## Analisis mensual (Node-RED)

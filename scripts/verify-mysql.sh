@@ -99,7 +99,7 @@ fi
 
 echo
 echo "5. Verificando tablas principales..."
-TABLES=("mediciones_brutas" "estados_medicion" "eventos_actuadores" "incidencias" "analisis_mediciones")
+TABLES=("mediciones_brutas" "mediciones_limpias" "estados_medicion" "eventos_actuadores" "incidencias" "analisis_mediciones")
 TABLE_ERRORS=0
 for T in "${TABLES[@]}"; do
   EXISTS=$(docker exec "$MYSQL_CONTAINER" mysql -u root -p"$MYSQL_ROOT_PWD" "$MYSQL_DB" -N -e "SHOW TABLES LIKE '$T';" 2>/dev/null | grep -c "$T" || true)
@@ -139,7 +139,16 @@ echo "9. Ultimas incidencias de calidad..."
 docker exec "$MYSQL_CONTAINER" mysql -u root -p"$MYSQL_ROOT_PWD" "$MYSQL_DB" -e "SELECT id, medicion_id, id_habitacion, tipo_incidencia, detalle_incidencia, created_at FROM vw_incidencias_medicion ORDER BY id DESC LIMIT 5;" 2>/dev/null || echo "No se pudieron obtener incidencias"
 
 echo
-echo "10. Resumen"
+echo "10. Verificando ceros en mediciones_limpias..."
+ZERO_COUNT=$(docker exec "$MYSQL_CONTAINER" mysql -u root -p"$MYSQL_ROOT_PWD" "$MYSQL_DB" -N -e "SELECT COUNT(*) FROM mediciones_limpias WHERE temperatura_c = 0 OR humedad_pct = 0 OR fosfina_mq135 = 0 OR co_mq7 = 0;" 2>/dev/null || echo "error")
+if [[ "$ZERO_COUNT" == "0" ]]; then
+  print_result 0 "mediciones_limpias sin valores 0"
+else
+  print_result 1 "mediciones_limpias tiene valores 0 (registros: $ZERO_COUNT)"
+fi
+
+echo
+echo "11. Resumen"
 echo "=============================================="
 echo "Node-RED UI:     http://localhost:1880"
 echo "MySQL (host):    localhost:${MYSQL_PORT:-3306}"
