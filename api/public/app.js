@@ -12,6 +12,7 @@ const connectionStatus = document.getElementById('connectionStatus');
 const detailTitle = document.getElementById('detailTitle');
 const detailMeta = document.getElementById('detailMeta');
 const detailRisk = document.getElementById('detailRisk');
+const detailContext = document.getElementById('detailContext');
 const actionStatus = document.getElementById('actionStatus');
 const incidentsList = document.getElementById('incidentsList');
 const motivoText = document.getElementById('motivoText');
@@ -22,16 +23,24 @@ const analysisRefresh = document.getElementById('analysisRefresh');
 const cleanBtn = document.getElementById('cleanBtn');
 const cleanStatus = document.getElementById('cleanStatus');
 const countBrutas = document.getElementById('countBrutas');
+const countPendientes = document.getElementById('countPendientes');
 const countLimpias = document.getElementById('countLimpias');
 const countIncidencias = document.getElementById('countIncidencias');
 const countAnalisis = document.getElementById('countAnalisis');
+const countEventos = document.getElementById('countEventos');
 const ultimaBruta = document.getElementById('ultimaBruta');
 const ultimaLimpia = document.getElementById('ultimaLimpia');
 const ultimaIncidencia = document.getElementById('ultimaIncidencia');
 const ultimaAnalisis = document.getElementById('ultimaAnalisis');
+const ultimoEvento = document.getElementById('ultimoEvento');
+const qualityBreakdown = document.getElementById('qualityBreakdown');
+const riskBreakdown = document.getElementById('riskBreakdown');
+const incidentTypeBreakdown = document.getElementById('incidentTypeBreakdown');
+const pendingTable = document.getElementById('pendingTable');
 const incidenciasTable = document.getElementById('incidenciasTable');
 const limpiasTable = document.getElementById('limpiasTable');
 const analisisTable = document.getElementById('analisisTable');
+const eventosTable = document.getElementById('eventosTable');
 
 let latestNodes = [];
 let selectedId = null;
@@ -83,6 +92,22 @@ function formatNumber(value) {
   if (value === null || value === undefined) return '--';
   const num = Number(value);
   return Number.isFinite(num) ? num.toLocaleString('es-CO') : '--';
+}
+
+function formatInterval(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) return '--';
+  if (num >= 1000) return `${(num / 1000).toLocaleString('es-CO')} s`;
+  return `${num.toLocaleString('es-CO')} ms`;
+}
+
+async function fetchJson(url, options) {
+  const response = await fetch(url, options);
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'request_failed');
+  }
+  return data;
 }
 
 function setActionStatus(text) {
@@ -318,7 +343,10 @@ function appendLatest(latest) {
 function updateDetail(latest) {
   if (!latest) return;
   detailTitle.textContent = `Nodo ${latest.id_habitacion}`;
-  detailMeta.textContent = `Contexto: ${latest.contexto_hotel} | Riesgo: ${latest.estado_riesgo || '--'} | Ultimo: ${formatTimestamp(latest.timestamp_origen)}`;
+  detailMeta.textContent = `Ultima medicion: ${formatTimestamp(latest.timestamp_origen)} | Registro: ${latest.id || '--'}`;
+  if (detailContext) {
+    detailContext.textContent = latest.contexto_hotel || '-';
+  }
   detailRisk.textContent = latest.estado_riesgo || '-';
   detailRisk.style.background = `${getRiskColor(latest.estado_riesgo)}22`;
   detailRisk.style.color = getRiskColor(latest.estado_riesgo);
@@ -422,6 +450,7 @@ function renderTable(container, headers, rows, columnCount) {
 
   const headerRow = document.createElement('div');
   headerRow.className = `table-row header cols-${columnCount}`;
+  headerRow.style.gridTemplateColumns = `repeat(${columnCount}, minmax(110px, 1fr))`;
   headers.forEach((title) => {
     const cell = document.createElement('span');
     cell.textContent = title;
@@ -432,6 +461,7 @@ function renderTable(container, headers, rows, columnCount) {
   rows.forEach((row) => {
     const rowEl = document.createElement('div');
     rowEl.className = `table-row cols-${columnCount}`;
+    rowEl.style.gridTemplateColumns = `repeat(${columnCount}, minmax(110px, 1fr))`;
     row.forEach((cellValue) => {
       const cell = document.createElement('span');
       cell.textContent = cellValue;
@@ -441,58 +471,118 @@ function renderTable(container, headers, rows, columnCount) {
   });
 }
 
+function renderBreakdown(container, rows, labelFn) {
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (!rows.length) {
+    container.textContent = 'Sin datos.';
+    return;
+  }
+
+  rows.forEach((row) => {
+    const item = document.createElement('div');
+    item.className = 'breakdown-item';
+
+    const label = document.createElement('span');
+    label.textContent = labelFn(row);
+
+    const value = document.createElement('strong');
+    value.textContent = formatNumber(row.total);
+
+    item.appendChild(label);
+    item.appendChild(value);
+    container.appendChild(item);
+  });
+}
+
 async function loadAnalysis() {
   try {
-    const summaryRes = await fetch(`${API_BASE}/analysis/summary`);
-    const summary = await summaryRes.json();
+    const [summary, incData, limpiasData, brutasData, analData, eventosData] = await Promise.all([
+      fetchJson(`${API_BASE}/analysis/summary`),
+      fetchJson(`${API_BASE}/analysis/incidencias?limit=20`),
+      fetchJson(`${API_BASE}/analysis/limpias?limit=20`),
+      fetchJson(`${API_BASE}/analysis/brutas?limpio=0&limit=12`),
+      fetchJson(`${API_BASE}/analysis/analisis?limit=20`),
+      fetchJson(`${API_BASE}/analysis/eventos?limit=20`)
+    ]);
 
     if (countBrutas) countBrutas.textContent = formatNumber(summary.total_brutas);
+    if (countPendientes) countPendientes.textContent = formatNumber(summary.total_pendientes);
     if (countLimpias) countLimpias.textContent = formatNumber(summary.total_limpias);
     if (countIncidencias) countIncidencias.textContent = formatNumber(summary.total_incidencias);
     if (countAnalisis) countAnalisis.textContent = formatNumber(summary.total_analisis);
+    if (countEventos) countEventos.textContent = formatNumber(summary.total_eventos);
     if (ultimaBruta) ultimaBruta.textContent = formatTimestamp(summary.ultima_medicion);
     if (ultimaLimpia) ultimaLimpia.textContent = formatTimestamp(summary.ultima_limpia);
     if (ultimaIncidencia) ultimaIncidencia.textContent = formatTimestamp(summary.ultima_incidencia);
     if (ultimaAnalisis) ultimaAnalisis.textContent = formatTimestamp(summary.ultima_analisis);
+    if (ultimoEvento) ultimoEvento.textContent = formatTimestamp(summary.ultimo_evento);
 
-    const incRes = await fetch(`${API_BASE}/analysis/incidencias?limit=20`);
-    const incData = await incRes.json();
+    renderBreakdown(qualityBreakdown, summary.calidad || [], (row) => (
+      Number(row.limpio) === 1 ? 'Procesadas' : 'Pendientes'
+    ));
+    renderBreakdown(riskBreakdown, summary.riesgos || [], (row) => row.estado_riesgo || 'SIN ESTADO');
+    renderBreakdown(
+      incidentTypeBreakdown,
+      summary.incidencias_por_tipo || [],
+      (row) => row.tipo_incidencia || 'SIN TIPO'
+    );
+
+    const pendingRows = (brutasData.items || []).map((item) => [
+      item.id,
+      item.id_habitacion,
+      item.contexto_hotel,
+      formatValue(item.temperatura_c, 'C'),
+      formatValue(item.humedad_pct, '%'),
+      formatTimestamp(item.timestamp_origen || item.created_at)
+    ]);
+    renderTable(pendingTable, ['ID', 'Habitacion', 'Contexto', 'Temp', 'Hum', 'Fecha'], pendingRows, 6);
+
     const incRows = (incData.items || []).map((item) => [
       item.id_habitacion,
       item.tipo_incidencia,
       item.detalle_incidencia,
-      formatTimestamp(item.timestamp_origen || item.incidencia_created_at)
+      formatTimestamp(item.incidencia_created_at || item.timestamp_origen)
     ]);
     renderTable(incidenciasTable, ['Habitacion', 'Tipo', 'Detalle', 'Fecha'], incRows, 4);
 
-    const limpiasRes = await fetch(`${API_BASE}/analysis/limpias?limit=20`);
-    const limpiasData = await limpiasRes.json();
     const limpiasRows = (limpiasData.items || []).map((item) => [
       item.id_habitacion,
+      item.estado_riesgo || '--',
       formatValue(item.temperatura_c, 'C'),
       formatValue(item.humedad_pct, '%'),
       formatValue(item.fosfina_mq135),
       formatValue(item.co_mq7),
       formatTimestamp(item.timestamp_origen || item.created_at)
     ]);
-    renderTable(limpiasTable, ['Habitacion', 'Temp', 'Hum', 'PH3', 'CO', 'Fecha'], limpiasRows, 6);
+    renderTable(limpiasTable, ['Habitacion', 'Riesgo', 'Temp', 'Hum', 'PH3', 'CO', 'Fecha'], limpiasRows, 7);
 
-    const analRes = await fetch(`${API_BASE}/analysis/analisis?limit=20`);
-    const analData = await analRes.json();
     const analRows = (analData.items || []).map((item) => [
       item.id_habitacion || '--',
-      formatNumber(item.periodo_dias),
       formatNumber(item.total_registros),
-      formatNumber(item.temp_promedio),
-      formatNumber(item.hum_promedio),
+      `${formatNumber(item.temp_promedio)} / ${formatNumber(item.temp_rango)}`,
+      `${formatNumber(item.hum_promedio)} / ${formatNumber(item.hum_rango)}`,
+      formatNumber(item.fosfina_promedio),
+      formatNumber(item.co_promedio),
       formatTimestamp(item.fecha_generacion)
     ]);
     renderTable(
       analisisTable,
-      ['Habitacion', 'Dias', 'Registros', 'Temp prom', 'Hum prom', 'Generado'],
+      ['Habitacion', 'Registros', 'Temp prom/rango', 'Hum prom/rango', 'PH3 prom', 'CO prom', 'Generado'],
       analRows,
-      6
+      7
     );
+
+    const eventRows = (eventosData.items || []).map((item) => [
+      item.id_habitacion,
+      item.estado_riesgo,
+      item.contexto_hotel,
+      item.motivo_activacion,
+      formatInterval(item.intervalo_objetivo_ms),
+      formatTimestamp(item.created_at || item.timestamp_origen)
+    ]);
+    renderTable(eventosTable, ['Habitacion', 'Riesgo', 'Contexto', 'Motivo', 'Intervalo', 'Fecha'], eventRows, 6);
   } catch (err) {
     console.error(err);
   }
@@ -501,14 +591,11 @@ async function loadAnalysis() {
 async function triggerClean() {
   setCleanStatus('Lanzando limpieza...');
   try {
-    const response = await fetch(`${API_BASE}/analysis/clean`, { method: 'POST' });
-    const data = await response.json();
-    if (!response.ok) {
-      setCleanStatus(data.error || 'No se pudo iniciar limpieza.');
-      return;
-    }
+    const data = await fetchJson(`${API_BASE}/analysis/clean`, { method: 'POST' });
     const stamp = formatTimestamp(new Date().toISOString());
-    setCleanStatus(`Solicitada · ${stamp}`);
+    setCleanStatus(`${data.message || 'Solicitada'} · ${stamp}`);
+    loadAnalysis();
+    setTimeout(loadAnalysis, 2500);
   } catch (err) {
     setCleanStatus('No se pudo iniciar limpieza.');
   }

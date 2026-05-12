@@ -111,6 +111,7 @@ services:
     environment:
       - PORT=3001
       - TZ=${TZ:-America/Bogota}
+      - NODE_RED_BASE_URL=http://nodered:1880
     networks:
       - backend
 

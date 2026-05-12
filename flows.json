@@ -799,6 +799,46 @@
     "wires": [["c1e5b49a2f3c1113"]]
   },
   {
+    "id": "c1e5b49a2f3c1130",
+    "type": "http in",
+    "z": "c1e5b49a2f3c1111",
+    "name": "POST limpiar lote API",
+    "url": "/api/limpieza/lote",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 180,
+    "y": 60,
+    "wires": [["c1e5b49a2f3c1131"]]
+  },
+  {
+    "id": "c1e5b49a2f3c1131",
+    "type": "function",
+    "z": "c1e5b49a2f3c1111",
+    "name": "ack limpieza API",
+    "func": "const requestedAt = new Date().toISOString();\n\nconst runMsg = {\n    payload: 'LIMPIAR_100',\n    source: 'api',\n    requested_at: requestedAt\n};\n\nconst responseMsg = {\n    ...msg,\n    statusCode: 202,\n    headers: {\n        'Content-Type': 'application/json'\n    },\n    payload: {\n        ok: true,\n        action: 'LIMPIAR_100',\n        message: 'Limpieza de lote iniciada',\n        requested_at: requestedAt\n    }\n};\n\nreturn [runMsg, responseMsg];",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 430,
+    "y": 60,
+    "wires": [["c1e5b49a2f3c1113"], ["c1e5b49a2f3c1132"]]
+  },
+  {
+    "id": "c1e5b49a2f3c1132",
+    "type": "http response",
+    "z": "c1e5b49a2f3c1111",
+    "name": "response limpieza API",
+    "statusCode": "",
+    "headers": {},
+    "x": 670,
+    "y": 60,
+    "wires": []
+  },
+  {
     "id": "c1e5b49a2f3c1113",
     "type": "function",
     "z": "c1e5b49a2f3c1111",

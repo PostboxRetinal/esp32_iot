@@ -2,6 +2,8 @@
 
 Este repositorio incluye el flujo de ingestion en Node-RED, la base de datos MySQL y un simulador MQTT para validar reglas de calidad sin hardware.
 
+La documentacion completa de la pagina web y la API esta en [DOCUMENTACION_WEB_API.md](DOCUMENTACION_WEB_API.md).
+
 ## Limpieza de datos (Node-RED)
 
 El flujo **HTL-IOT-LIMPIEZA** procesa por demanda lotes de 100 registros con `limpio = 0` y aplica:
@@ -69,10 +71,13 @@ WHERE temperatura_c = 0 OR humedad_pct = 0 OR fosfina_mq135 = 0 OR co_mq7 = 0;
 ## Analisis mensual (Node-RED)
 
 En el flujo **HTL-IOT-PROCESAMIENTO** hay un inject **ANALISIS MENSUAL (ULTIMO MES)** que ejecuta un
-`INSERT ... SELECT` y llena la tabla `analisis_mediciones` con:
-- promedios, minimos y maximos de temperatura y humedad,
-- conteo de valores fuera de rango (temp < 18 o > 25; hum < 30 o > 60),
+analisis de 30 dias sobre `mediciones_limpias` y llena la tabla `analisis_mediciones` con:
+- estadistica descriptiva de temperatura, humedad, fosfina y CO,
+- anomalias y valores fuera de rango,
+- correlaciones, patrones temporales, relaciones entre variables y limitaciones,
 - total de registros y rango de fechas del ultimo mes.
+
+La web incluye una pestana **Analisis de datos** para consultar resumenes, incidencias, datos limpios, eventos y `analisis_mediciones`. Tambien permite disparar el flujo **LIMPIAR LOTE (100)** de Node-RED desde el boton `Limpiar lote (100)`.
 
 ## Simulador MQTT
 

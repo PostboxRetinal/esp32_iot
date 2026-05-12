@@ -28,7 +28,7 @@
 
       <nav class="tabs">
         <button class="tab active" data-page="dashboard">Dashboard</button>
-        <button class="tab" data-page="analysis">Analitica</button>
+        <button class="tab" data-page="analysis">Analisis de datos</button>
       </nav>
 
       <section id="dashboardPage" class="page page-dashboard active">
@@ -75,10 +75,17 @@
                 <p id="detailMeta" class="meta">Estado y ultimos valores</p>
               </div>
               <div class="detail-right">
-                <div class="pill" id="detailRisk">-</div>
-                <div class="motivo-inline">
-                  <span class="label">Motivo</span>
-                  <span id="motivoText">Sin eventos recientes.</span>
+                <div class="status-tile">
+                  <span class="label">Estado habitacion</span>
+                  <strong id="detailContext">-</strong>
+                </div>
+                <div class="status-tile compact">
+                  <span class="label">Riesgo</span>
+                  <strong id="detailRisk">-</strong>
+                </div>
+                <div class="status-tile motivo-inline">
+                  <span class="label">Motivo activacion</span>
+                  <strong id="motivoText">Sin eventos recientes.</strong>
                 </div>
               </div>
             </div>
@@ -90,8 +97,8 @@
                   <button data-state="RESERVADA" class="state">RESERVADA</button>
                   <button data-state="FUMIGACION" class="state">FUMIGACION</button>
                 </div>
-                <div class="status-message" id="actionStatus">
-                  <span class="label">Ultimo comando</span>
+                <div class="status-message command-chip" id="actionStatus">
+                  <span class="label">Comando</span>
                   <span class="value">Sin comandos</span>
                 </div>
               </div>
@@ -120,7 +127,7 @@
         <div class="analysis-layout">
           <section class="panel summary-panel">
             <div class="panel-header">
-              <h2>Analitica de datos</h2>
+              <h2>Analisis de datos</h2>
               <div class="analysis-actions">
                 <button id="analysisRefresh" class="ghost">Actualizar</button>
                 <button id="cleanBtn" class="ghost">Limpiar lote (100)</button>
@@ -131,6 +138,11 @@
                 <span>Brutas</span>
                 <strong id="countBrutas">0</strong>
                 <small>Ultimo: <span id="ultimaBruta">--</span></small>
+              </div>
+              <div class="summary-card warning">
+                <span>Pendientes</span>
+                <strong id="countPendientes">0</strong>
+                <small>Por limpiar en lotes de 100</small>
               </div>
               <div class="summary-card">
                 <span>Limpias</span>
@@ -147,14 +159,37 @@
                 <strong id="countAnalisis">0</strong>
                 <small>Ultimo: <span id="ultimaAnalisis">--</span></small>
               </div>
+              <div class="summary-card">
+                <span>Eventos</span>
+                <strong id="countEventos">0</strong>
+                <small>Ultimo: <span id="ultimoEvento">--</span></small>
+              </div>
             </div>
             <div class="status-message" id="cleanStatus">
               <span class="label">Limpieza</span>
               <span class="value">Sin ejecuciones.</span>
             </div>
+            <div class="insights-grid">
+              <div class="insight-card">
+                <h3>Calidad</h3>
+                <div id="qualityBreakdown" class="breakdown-list">Sin datos.</div>
+              </div>
+              <div class="insight-card">
+                <h3>Riesgo</h3>
+                <div id="riskBreakdown" class="breakdown-list">Sin datos.</div>
+              </div>
+              <div class="insight-card">
+                <h3>Incidencias por tipo</h3>
+                <div id="incidentTypeBreakdown" class="breakdown-list">Sin datos.</div>
+              </div>
+            </div>
           </section>
 
           <section class="panel data-panel">
+            <div class="data-section">
+              <h3>Brutas pendientes de limpieza</h3>
+              <div id="pendingTable" class="table"></div>
+            </div>
             <div class="data-section">
               <h3>Incidencias recientes</h3>
               <div id="incidenciasTable" class="table"></div>
@@ -166,6 +201,10 @@
             <div class="data-section">
               <h3>Analisis mensual</h3>
               <div id="analisisTable" class="table"></div>
+            </div>
+            <div class="data-section">
+              <h3>Eventos actuadores recientes</h3>
+              <div id="eventosTable" class="table"></div>
             </div>
           </section>
         </div>
