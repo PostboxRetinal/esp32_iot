@@ -94,6 +94,26 @@ services:
     networks:
       - backend
 
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    image: esp32-iot-api:latest
+    container_name: esp32-iot-api
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    environment:
+      - PORT=3001
+      - TZ=${TZ:-America/Bogota}
+    networks:
+      - backend
+
 volumes:
   nodered_data:
   mysql_data:

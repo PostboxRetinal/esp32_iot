@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hotel IoT Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Space+Grotesk:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <div>
+          <p class="kicker">Control en tiempo real</p>
+          <h1>Hotel IoT Dashboard</h1>
+          <p class="subtitle">Monitoreo, riesgo y control de estado por nodo.</p>
+        </div>
+        <div class="status" id="connectionStatus">
+          <span class="dot"></span>
+          <span>Conectando...</span>
+        </div>
+      </header>
+
+      <nav class="tabs">
+        <button class="tab active" data-page="dashboard">Dashboard</button>
+        <button class="tab" data-page="analysis">Analitica</button>
+      </nav>
+
+      <section id="dashboardPage" class="page page-dashboard active">
+        <section class="filters">
+          <div class="filter">
+            <label for="searchInput">Buscar nodo</label>
+            <input id="searchInput" placeholder="HTL-N-P1-201" />
+          </div>
+          <div class="filter">
+            <label for="contextFilter">Contexto</label>
+            <select id="contextFilter">
+              <option value="">Todos</option>
+              <option value="LIBRE">LIBRE</option>
+              <option value="RESERVADA">RESERVADA</option>
+              <option value="FUMIGACION">FUMIGACION</option>
+            </select>
+          </div>
+          <div class="filter">
+            <label for="riskFilter">Riesgo</label>
+            <select id="riskFilter">
+              <option value="">Todos</option>
+              <option value="NORMAL">NORMAL</option>
+              <option value="ALERTA">ALERTA</option>
+              <option value="EMERGENCIA">EMERGENCIA</option>
+              <option value="INVALIDO">INVALIDO</option>
+            </select>
+          </div>
+          <button id="refreshBtn" class="ghost">Actualizar</button>
+        </section>
+
+        <main class="layout">
+          <section class="panel list-panel">
+            <div class="panel-header">
+              <h2>Nodos activos</h2>
+              <span id="nodeCount" class="pill">0</span>
+            </div>
+            <div id="nodesList" class="nodes-list"></div>
+          </section>
+
+          <section class="panel detail-panel">
+            <div class="panel-header detail-header">
+              <div>
+                <h2 id="detailTitle">Selecciona un nodo</h2>
+                <p id="detailMeta" class="meta">Estado y ultimos valores</p>
+              </div>
+              <div class="detail-right">
+                <div class="pill" id="detailRisk">-</div>
+                <div class="motivo-inline">
+                  <span class="label">Motivo</span>
+                  <span id="motivoText">Sin eventos recientes.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="detail-body">
+              <div class="controls">
+                <div class="state-buttons">
+                  <button data-state="LIBRE" class="state">LIBRE</button>
+                  <button data-state="RESERVADA" class="state">RESERVADA</button>
+                  <button data-state="FUMIGACION" class="state">FUMIGACION</button>
+                </div>
+                <div class="status-message" id="actionStatus">
+                  <span class="label">Ultimo comando</span>
+                  <span class="value">Sin comandos</span>
+                </div>
+              </div>
+
+              <div class="charts">
+                <div class="chart-card">
+                  <h3>Ambiente</h3>
+                  <canvas id="envChart"></canvas>
+                </div>
+                <div class="chart-card">
+                  <h3>Gases</h3>
+                  <canvas id="gasChart"></canvas>
+                </div>
+              </div>
+
+              <div class="incidents">
+                <h3>Ultimas incidencias</h3>
+                <div id="incidentsList" class="incident-list">Sin incidencias.</div>
+              </div>
+            </div>
+          </section>
+        </main>
+      </section>
+
+      <section id="analysisPage" class="page page-analysis">
+        <div class="analysis-layout">
+          <section class="panel summary-panel">
+            <div class="panel-header">
+              <h2>Analitica de datos</h2>
+              <div class="analysis-actions">
+                <button id="analysisRefresh" class="ghost">Actualizar</button>
+                <button id="cleanBtn" class="ghost">Limpiar lote (100)</button>
+              </div>
+            </div>
+            <div class="summary-cards">
+              <div class="summary-card">
+                <span>Brutas</span>
+                <strong id="countBrutas">0</strong>
+                <small>Ultimo: <span id="ultimaBruta">--</span></small>
+              </div>
+              <div class="summary-card">
+                <span>Limpias</span>
+                <strong id="countLimpias">0</strong>
+                <small>Ultimo: <span id="ultimaLimpia">--</span></small>
+              </div>
+              <div class="summary-card">
+                <span>Incidencias</span>
+                <strong id="countIncidencias">0</strong>
+                <small>Ultimo: <span id="ultimaIncidencia">--</span></small>
+              </div>
+              <div class="summary-card">
+                <span>Analisis</span>
+                <strong id="countAnalisis">0</strong>
+                <small>Ultimo: <span id="ultimaAnalisis">--</span></small>
+              </div>
+            </div>
+            <div class="status-message" id="cleanStatus">
+              <span class="label">Limpieza</span>
+              <span class="value">Sin ejecuciones.</span>
+            </div>
+          </section>
+
+          <section class="panel data-panel">
+            <div class="data-section">
+              <h3>Incidencias recientes</h3>
+              <div id="incidenciasTable" class="table"></div>
+            </div>
+            <div class="data-section">
+              <h3>Datos limpios recientes</h3>
+              <div id="limpiasTable" class="table"></div>
+            </div>
+            <div class="data-section">
+              <h3>Analisis mensual</h3>
+              <div id="analisisTable" class="table"></div>
+            </div>
+          </section>
+        </div>
+      </section>
+    </div>
+
+    <script src="/vendor/chart.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

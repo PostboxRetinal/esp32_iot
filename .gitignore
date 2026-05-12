@@ -2,3 +2,5 @@
 .vscode/
 .env
 include/config.h
+node_modules/
+api/node_modules/
