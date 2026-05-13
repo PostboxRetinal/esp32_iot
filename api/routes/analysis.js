@@ -5,6 +5,7 @@ const { toInt, clamp } = require('../lib/validators');
 const router = express.Router();
 const NODE_RED_BASE_URL = (process.env.NODE_RED_BASE_URL || 'http://localhost:1880').replace(/\/$/, '');
 const NODE_RED_CLEAN_URL = process.env.NODE_RED_CLEAN_URL || `${NODE_RED_BASE_URL}/api/limpieza/lote`;
+const NODE_RED_MONTHLY_ANALYSIS_URL = process.env.NODE_RED_MONTHLY_ANALYSIS_URL || `${NODE_RED_BASE_URL}/api/analisis/mensual`;
 const NODE_RED_TIMEOUT_MS = Number(process.env.NODE_RED_TIMEOUT_MS || 5000);
 
 function queryLimit(value, fallback = 20, max = 200) {
@@ -25,15 +26,15 @@ function parseJsonField(value) {
   }
 }
 
-async function postNodeRedClean() {
+async function postNodeRedAction(url, action) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), NODE_RED_TIMEOUT_MS);
 
   try {
-    const response = await fetch(NODE_RED_CLEAN_URL, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source: 'web-api', action: 'LIMPIAR_100' }),
+      body: JSON.stringify({ source: 'web-api', action }),
       signal: controller.signal
     });
 
@@ -46,7 +47,7 @@ async function postNodeRedClean() {
     }
 
     if (!response.ok) {
-      const err = new Error('node_red_clean_failed');
+      const err = new Error(`node_red_${action.toLowerCase()}_failed`);
       err.status = response.status;
       err.payload = payload;
       throw err;
@@ -56,6 +57,14 @@ async function postNodeRedClean() {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function postNodeRedClean() {
+  return postNodeRedAction(NODE_RED_CLEAN_URL, 'LIMPIAR_100');
+}
+
+function postNodeRedMonthlyAnalysis() {
+  return postNodeRedAction(NODE_RED_MONTHLY_ANALYSIS_URL, 'ANALISIS_MENSUAL');
 }
 
 router.get('/analysis/summary', async (_req, res) => {
@@ -306,6 +315,25 @@ router.post('/analysis/clean', async (_req, res) => {
     console.error('[api] /analysis/clean error', isAbort ? 'node_red_timeout' : err.message);
     res.status(isAbort ? 504 : 502).json({
       error: isAbort ? 'timeout conectando con node-red' : 'no se pudo iniciar limpieza en node-red',
+      detail: err.payload || null
+    });
+  }
+});
+
+router.post('/analysis/monthly', async (_req, res) => {
+  try {
+    const nodeRed = await postNodeRedMonthlyAnalysis();
+    res.status(202).json({
+      ok: true,
+      action: 'ANALISIS_MENSUAL',
+      message: 'analisis mensual solicitado en Node-RED',
+      node_red: nodeRed
+    });
+  } catch (err) {
+    const isAbort = err.name === 'AbortError';
+    console.error('[api] /analysis/monthly error', isAbort ? 'node_red_timeout' : err.message);
+    res.status(isAbort ? 504 : 502).json({
+      error: isAbort ? 'timeout conectando con node-red' : 'no se pudo iniciar analisis mensual en node-red',
       detail: err.payload || null
     });
   }

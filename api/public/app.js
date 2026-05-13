@@ -21,7 +21,9 @@ const dashboardPage = document.getElementById('dashboardPage');
 const analysisPage = document.getElementById('analysisPage');
 const analysisRefresh = document.getElementById('analysisRefresh');
 const cleanBtn = document.getElementById('cleanBtn');
+const monthlyAnalysisBtn = document.getElementById('monthlyAnalysisBtn');
 const cleanStatus = document.getElementById('cleanStatus');
+const monthlyAnalysisStatus = document.getElementById('monthlyAnalysisStatus');
 const countBrutas = document.getElementById('countBrutas');
 const countPendientes = document.getElementById('countPendientes');
 const countLimpias = document.getElementById('countLimpias');
@@ -41,6 +43,13 @@ const incidenciasTable = document.getElementById('incidenciasTable');
 const limpiasTable = document.getElementById('limpiasTable');
 const analisisTable = document.getElementById('analisisTable');
 const eventosTable = document.getElementById('eventosTable');
+const tableTabButtons = document.querySelectorAll('[data-table-tab]');
+const tablePanels = document.querySelectorAll('[data-table-panel]');
+const tabPendingCount = document.getElementById('tabPendingCount');
+const tabIncidenciasCount = document.getElementById('tabIncidenciasCount');
+const tabLimpiasCount = document.getElementById('tabLimpiasCount');
+const tabAnalisisCount = document.getElementById('tabAnalisisCount');
+const tabEventosCount = document.getElementById('tabEventosCount');
 
 let latestNodes = [];
 let selectedId = null;
@@ -110,24 +119,26 @@ async function fetchJson(url, options) {
   return data;
 }
 
-function setActionStatus(text) {
-  if (!actionStatus) return;
-  const value = actionStatus.querySelector('.value');
+function setStatus(container, text) {
+  if (!container) return;
+  const value = container.querySelector('.value');
   if (value) {
     value.textContent = text;
   } else {
-    actionStatus.textContent = text;
+    container.textContent = text;
   }
 }
 
+function setActionStatus(text) {
+  setStatus(actionStatus, text);
+}
+
 function setCleanStatus(text) {
-  if (!cleanStatus) return;
-  const value = cleanStatus.querySelector('.value');
-  if (value) {
-    value.textContent = text;
-  } else {
-    cleanStatus.textContent = text;
-  }
+  setStatus(cleanStatus, text);
+}
+
+function setMonthlyAnalysisStatus(text) {
+  setStatus(monthlyAnalysisStatus, text);
 }
 
 function applyFilters() {
@@ -496,6 +507,20 @@ function renderBreakdown(container, rows, labelFn) {
   });
 }
 
+function switchTablePanel(target) {
+  tableTabButtons.forEach((button) => {
+    const isActive = button.dataset.tableTab === target;
+    button.classList.toggle('active', isActive);
+    button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  });
+
+  tablePanels.forEach((panel) => {
+    const isActive = panel.dataset.tablePanel === target;
+    panel.classList.toggle('active', isActive);
+    panel.hidden = !isActive;
+  });
+}
+
 async function loadAnalysis() {
   try {
     const [summary, incData, limpiasData, brutasData, analData, eventosData] = await Promise.all([
@@ -513,6 +538,11 @@ async function loadAnalysis() {
     if (countIncidencias) countIncidencias.textContent = formatNumber(summary.total_incidencias);
     if (countAnalisis) countAnalisis.textContent = formatNumber(summary.total_analisis);
     if (countEventos) countEventos.textContent = formatNumber(summary.total_eventos);
+    if (tabPendingCount) tabPendingCount.textContent = formatNumber(summary.total_pendientes);
+    if (tabIncidenciasCount) tabIncidenciasCount.textContent = formatNumber(summary.total_incidencias);
+    if (tabLimpiasCount) tabLimpiasCount.textContent = formatNumber(summary.total_limpias);
+    if (tabAnalisisCount) tabAnalisisCount.textContent = formatNumber(summary.total_analisis);
+    if (tabEventosCount) tabEventosCount.textContent = formatNumber(summary.total_eventos);
     if (ultimaBruta) ultimaBruta.textContent = formatTimestamp(summary.ultima_medicion);
     if (ultimaLimpia) ultimaLimpia.textContent = formatTimestamp(summary.ultima_limpia);
     if (ultimaIncidencia) ultimaIncidencia.textContent = formatTimestamp(summary.ultima_incidencia);
@@ -590,6 +620,8 @@ async function loadAnalysis() {
 
 async function triggerClean() {
   setCleanStatus('Lanzando limpieza...');
+  if (cleanBtn) cleanBtn.disabled = true;
+
   try {
     const data = await fetchJson(`${API_BASE}/analysis/clean`, { method: 'POST' });
     const stamp = formatTimestamp(new Date().toISOString());
@@ -598,6 +630,27 @@ async function triggerClean() {
     setTimeout(loadAnalysis, 2500);
   } catch (err) {
     setCleanStatus('No se pudo iniciar limpieza.');
+  } finally {
+    if (cleanBtn) cleanBtn.disabled = false;
+  }
+}
+
+async function triggerMonthlyAnalysis() {
+  setMonthlyAnalysisStatus('Lanzando analisis...');
+  if (monthlyAnalysisBtn) monthlyAnalysisBtn.disabled = true;
+
+  try {
+    const data = await fetchJson(`${API_BASE}/analysis/monthly`, { method: 'POST' });
+    const stamp = formatTimestamp(new Date().toISOString());
+    setMonthlyAnalysisStatus(`${data.message || 'Solicitado'} · ${stamp}`);
+    switchTablePanel('analisis');
+    loadAnalysis();
+    setTimeout(loadAnalysis, 2500);
+    setTimeout(loadAnalysis, 6000);
+  } catch (err) {
+    setMonthlyAnalysisStatus('No se pudo iniciar analisis mensual.');
+  } finally {
+    if (monthlyAnalysisBtn) monthlyAnalysisBtn.disabled = false;
   }
 }
 
@@ -655,6 +708,30 @@ if (analysisRefresh) {
 if (cleanBtn) {
   cleanBtn.addEventListener('click', triggerClean);
 }
+
+if (monthlyAnalysisBtn) {
+  monthlyAnalysisBtn.addEventListener('click', triggerMonthlyAnalysis);
+}
+
+tableTabButtons.forEach((button) => {
+  button.addEventListener('click', () => switchTablePanel(button.dataset.tableTab));
+  button.addEventListener('keydown', (event) => {
+    const tabList = Array.from(tableTabButtons);
+    const currentIndex = tabList.indexOf(button);
+    let nextIndex = currentIndex;
+
+    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabList.length;
+    if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabList.length) % tabList.length;
+    if (event.key === 'Home') nextIndex = 0;
+    if (event.key === 'End') nextIndex = tabList.length - 1;
+
+    if (nextIndex !== currentIndex) {
+      event.preventDefault();
+      tabList[nextIndex].focus();
+      switchTablePanel(tabList[nextIndex].dataset.tableTab);
+    }
+  });
+});
 
 document.querySelectorAll('[data-state]').forEach((btn) => {
   btn.addEventListener('click', () => sendState(btn.dataset.state));

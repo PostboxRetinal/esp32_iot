@@ -1070,6 +1070,46 @@
     "wires": [["e5b3a6d0b2c81110"]]
   },
   {
+    "id": "b7c4f7c2aebc1120",
+    "type": "http in",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "POST analisis mensual API",
+    "url": "/api/analisis/mensual",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 240,
+    "y": 1060,
+    "wires": [["b7c4f7c2aebc1121"]]
+  },
+  {
+    "id": "b7c4f7c2aebc1121",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "ack analisis mensual API",
+    "func": "const requestedAt = new Date().toISOString();\n\nconst runMsg = {\n    payload: 'ANALISIS_MENSUAL',\n    source: 'api',\n    requested_at: requestedAt\n};\n\nconst responseMsg = {\n    ...msg,\n    statusCode: 202,\n    headers: {\n        'Content-Type': 'application/json'\n    },\n    payload: {\n        ok: true,\n        action: 'ANALISIS_MENSUAL',\n        message: 'Analisis mensual iniciado',\n        requested_at: requestedAt\n    }\n};\n\nreturn [runMsg, responseMsg];",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 520,
+    "y": 1060,
+    "wires": [["e5b3a6d0b2c81110"], ["b7c4f7c2aebc1122"]]
+  },
+  {
+    "id": "b7c4f7c2aebc1122",
+    "type": "http response",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "response analisis mensual API",
+    "statusCode": "",
+    "headers": {},
+    "x": 790,
+    "y": 1060,
+    "wires": []
+  },
+  {
     "id": "e5b3a6d0b2c81110",
     "type": "function",
     "z": "b7d6c0b9c8cf00d5",

@@ -170,6 +170,12 @@ button:hover {
   transform: translateY(-1px);
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
 button.ghost {
   background: rgba(28, 27, 24, 0.08);
   color: var(--ink);
@@ -520,10 +526,37 @@ button.ghost {
   min-height: 0;
 }
 
-.analysis-actions {
-  display: flex;
-  flex-wrap: wrap;
+.analysis-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(28, 27, 24, 0.08);
+  border-radius: 16px;
+  background: rgba(248, 246, 241, 0.72);
+}
+
+.analysis-toolbar button {
+  box-shadow: none;
+  min-height: 42px;
+}
+
+.action-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.action-secondary {
+  background: rgba(245, 158, 11, 0.16);
+  color: #7a4a05;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+}
+
+.analysis-statuses {
+  display: grid;
   gap: 8px;
+  margin-bottom: 12px;
 }
 
 .summary-panel {
@@ -598,10 +631,74 @@ button.ghost {
 }
 
 .data-panel {
-  overflow: auto;
+  overflow: hidden;
   display: grid;
-  gap: 16px;
-  padding-right: 6px;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 12px;
+}
+
+.data-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.data-panel-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.table-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px;
+  border-radius: 16px;
+  background: rgba(28, 27, 24, 0.06);
+}
+
+.table-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+  font-size: 12px;
+}
+
+.table-tab span {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(28, 27, 24, 0.08);
+  color: var(--ink);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+}
+
+.table-tab.active {
+  background: var(--ink);
+  color: #fff;
+}
+
+.table-tab.active span {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.table-panel {
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.table-panel[hidden] {
+  display: none;
 }
 
 .data-section h3 {
@@ -610,7 +707,11 @@ button.ghost {
 }
 
 .data-section {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
 }
 
 .table {
@@ -618,8 +719,10 @@ button.ghost {
   gap: 6px;
   font-size: 12px;
   color: var(--muted);
-  overflow-x: auto;
+  overflow: auto;
   padding-bottom: 2px;
+  flex: 1;
+  min-height: 0;
 }
 
 .table-row {
@@ -660,6 +763,10 @@ button.ghost {
     grid-template-columns: 1fr;
   }
 
+  .analysis-toolbar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .detail-right {
     grid-template-columns: 1fr;
     min-width: 100%;
@@ -693,6 +800,14 @@ button.ghost {
 
   .controls {
     align-items: stretch;
+  }
+
+  .analysis-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .table-tabs {
+    margin: 0 -4px;
   }
 
   .state-buttons,
