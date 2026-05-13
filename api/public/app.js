@@ -116,6 +116,17 @@ function formatInterval(value) {
   return `${num.toLocaleString('es-CO')} ms`;
 }
 
+function getFreshnessTimestamp(node) {
+  if (!node) return null;
+  // Use ingestion time for online/offline checks; telemetry timestamps can drift.
+  return parseTimestamp(node.created_at || node.timestamp_origen);
+}
+
+function getFreshnessLabel(node) {
+  if (!node) return '--';
+  return formatTimestamp(node.created_at || node.timestamp_origen);
+}
+
 async function fetchJson(url, options) {
   const response = await fetch(url, options);
   const data = await response.json();
@@ -178,11 +189,11 @@ function renderNodes(nodes) {
       card.classList.add('active');
     }
 
-    const lastSeenTs = parseTimestamp(node.timestamp_origen);
+    const lastSeenTs = getFreshnessTimestamp(node);
     const isOnline = lastSeenTs ? (Date.now() - lastSeenTs) <= ONLINE_WINDOW_MS : false;
     const statusClass = isOnline ? 'online' : 'offline';
-    const statusText = isOnline ? 'En linea' : 'Sin datos';
-    const freshnessLabel = lastSeenTs ? formatTimestamp(node.timestamp_origen) : '--';
+    const statusText = isOnline ? 'EN LINEA' : 'SIN DATOS';
+    const freshnessLabel = getFreshnessLabel(node);
     const freshnessText = isOnline ? `Ultimo: ${freshnessLabel}` : `Sin datos desde: ${freshnessLabel}`;
 
     card.innerHTML = `
@@ -364,8 +375,8 @@ function appendLatest(latest) {
 function updateDetail(latest) {
   if (!latest) return;
   detailTitle.textContent = `Nodo ${latest.id_habitacion}`;
-  const freshnessTs = parseTimestamp(latest.timestamp_origen);
-  const freshnessLabel = formatTimestamp(latest.timestamp_origen);
+  const freshnessTs = getFreshnessTimestamp(latest);
+  const freshnessLabel = getFreshnessLabel(latest);
   const isOnline = freshnessTs ? (Date.now() - freshnessTs) <= ONLINE_WINDOW_MS : false;
   detailMeta.textContent = isOnline
     ? `Ultima medicion: ${freshnessLabel} | Registro: ${latest.id || '--'}`
