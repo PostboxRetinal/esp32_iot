@@ -392,18 +392,31 @@ button.ghost {
 
 .state {
   background: #1f2937;
+  color: #fff;
+  font-weight: 600;
 }
 
 .state[data-state="LIBRE"] {
-  background: #0f766e;
+  background: #16a34a;
 }
 
 .state[data-state="RESERVADA"] {
-  background: #c2410c;
+  background: #2563eb;
 }
 
 .state[data-state="FUMIGACION"] {
-  background: #4f46e5;
+  background: #f59e0b;
+  color: #1c1b18;
+}
+
+.packet-section {
+  display: grid;
+  gap: 8px;
+}
+
+.packet-section h3 {
+  margin: 0;
+  font-size: 15px;
 }
 
 .interval {
@@ -734,7 +747,13 @@ button.ghost {
   background: rgba(248, 246, 241, 0.8);
   border: 1px solid rgba(28, 27, 24, 0.08);
   min-width: 100%;
-  width: max-content;
+  width: 100%;
+}
+
+.table-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .table-row.header {

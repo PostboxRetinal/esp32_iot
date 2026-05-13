@@ -539,7 +539,7 @@
     "id": "eb02b22c71c90b33",
     "type": "inject",
     "z": "b7d6c0b9c8cf00d5",
-    "name": "SELECT EVENTOS (ULTIMOS 20)",
+    "name": "SELECT EVENTOS (ÚLTIMOS 20)",
     "props": [
       {
         "p": "payload"
@@ -559,7 +559,7 @@
     "id": "9e7c0db4f16a1f10",
     "type": "inject",
     "z": "b7d6c0b9c8cf00d5",
-    "name": "SELECT ANALISIS (ULTIMOS 20)",
+    "name": "SELECT ANALISIS (ÚLTIMOS 20)",
     "props": [
       {
         "p": "payload"

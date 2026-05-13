@@ -61,7 +61,7 @@ La API esta en `api/server.js` y sus rutas estan bajo `/api`.
 | GET | `/api/nodes/:id/series` | Devuelve serie historica para graficas. Acepta `from`, `to`, `limit`. |
 | GET | `/api/nodes/:id/incidencias` | Devuelve incidencias recientes de una habitacion. |
 | POST | `/api/nodes/:id/state` | Publica comando MQTT con `estado` dirigido a la habitacion. |
-| GET | `/api/stream/latest` | SSE con ultimos nodos para refresco en tiempo real. |
+| GET | `/api/stream/latest` | SSE con últimos nodos para refresco en tiempo real. |
 
 Payload para cambiar estado:
 
@@ -140,7 +140,7 @@ Reglas principales:
 
 ## Analisis mensual
 
-El inject Node-RED `ANALISIS MENSUAL (ULTIMO MES)` calcula datos de los ultimos 30 dias desde `mediciones_limpias` y escribe en `analisis_mediciones`.
+El inject Node-RED `ANALISIS MENSUAL (ULTIMO MES)` calcula datos de los últimos 30 dias desde `mediciones_limpias` y escribe en `analisis_mediciones`.
 
 Campos importantes:
 

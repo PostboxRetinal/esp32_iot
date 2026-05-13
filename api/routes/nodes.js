@@ -70,9 +70,29 @@ router.get('/nodes/:id/series', async (req, res) => {
     const now = new Date();
     const fromDefault = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
+    const limit = clamp(toInt(req.query.limit, 50), 1, 2000);
+    const recentOnly = req.query.recent === '1' || req.query.recent === 'true' || (req.query.from === undefined && req.query.to === undefined);
+
+    if (recentOnly) {
+      const sql = `
+        SELECT * FROM (
+          SELECT timestamp_origen, temperatura_c, humedad_pct, fosfina_mq135, co_mq7, presencia_pir,
+                 estado_riesgo, contexto_hotel
+          FROM vw_mediciones_estado
+          WHERE id_habitacion = ?
+          ORDER BY timestamp_origen DESC, id DESC
+          LIMIT ?
+        ) t
+        ORDER BY timestamp_origen ASC
+      `;
+
+      const [rows] = await pool.query(sql, [id, limit]);
+      res.json({ items: rows, limit, mode: 'recent' });
+      return;
+    }
+
     const fromDate = parseDateParam(req.query.from) || fromDefault;
     const toDate = parseDateParam(req.query.to) || now;
-    const limit = clamp(toInt(req.query.limit, 500), 1, 2000);
 
     const start = fromDate <= toDate ? fromDate : toDate;
     const end = fromDate <= toDate ? toDate : fromDate;
@@ -96,7 +116,7 @@ router.get('/nodes/:id/series', async (req, res) => {
       limit
     ]);
 
-    res.json({ items: rows, from: toMysqlDateTime(start), to: toMysqlDateTime(end) });
+    res.json({ items: rows, from: toMysqlDateTime(start), to: toMysqlDateTime(end), mode: 'range' });
   } catch (err) {
     console.error('[api] /nodes/:id/series error', err.message);
     res.status(500).json({ error: 'error consultando series' });

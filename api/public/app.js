@@ -1,6 +1,8 @@
 const API_BASE = `${window.location.origin}/api`;
 const MAX_POINTS = 50;
 const ONLINE_WINDOW_MS = 60 * 1000;
+const APP_TIME_ZONE = 'Etc/GMT+5';
+const APP_TIME_OFFSET = '-05:00';
 
 const nodesList = document.getElementById('nodesList');
 const nodeCount = document.getElementById('nodeCount');
@@ -15,6 +17,7 @@ const detailRisk = document.getElementById('detailRisk');
 const detailContext = document.getElementById('detailContext');
 const actionStatus = document.getElementById('actionStatus');
 const incidentsList = document.getElementById('incidentsList');
+const packetLog = document.getElementById('packetLog');
 const motivoText = document.getElementById('motivoText');
 const tabs = document.querySelectorAll('.tab');
 const dashboardPage = document.getElementById('dashboardPage');
@@ -79,7 +82,9 @@ function formatValue(value, suffix) {
 
 function parseTimestamp(value) {
   if (!value) return null;
-  const ts = Date.parse(String(value).replace(' ', 'T'));
+  const normalized = String(value).trim().replace(' ', 'T');
+  const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalized);
+  const ts = Date.parse(hasZone ? normalized : `${normalized}${APP_TIME_OFFSET}`);
   return Number.isFinite(ts) ? ts : null;
 }
 
@@ -93,6 +98,7 @@ function formatTimestamp(value) {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: APP_TIME_ZONE,
     hour12: false
   });
 }
@@ -176,6 +182,8 @@ function renderNodes(nodes) {
     const isOnline = lastSeenTs ? (Date.now() - lastSeenTs) <= ONLINE_WINDOW_MS : false;
     const statusClass = isOnline ? 'online' : 'offline';
     const statusText = isOnline ? 'En linea' : 'Sin datos';
+    const freshnessLabel = lastSeenTs ? formatTimestamp(node.timestamp_origen) : '--';
+    const freshnessText = isOnline ? `Ultimo: ${freshnessLabel}` : `Sin datos desde: ${freshnessLabel}`;
 
     card.innerHTML = `
       <div class="node-title">
@@ -195,7 +203,7 @@ function renderNodes(nodes) {
         <span>CO: ${formatValue(node.co_mq7)}</span>
       </div>
       <div class="node-meta">
-        <span>Ultimo: ${formatTimestamp(node.timestamp_origen)}</span>
+        <span>${freshnessText}</span>
       </div>
     `;
 
@@ -311,6 +319,8 @@ function updateCharts(series) {
   } else {
     lastSeriesTs = null;
   }
+
+  renderPacketLog(trimmed);
 }
 
 function appendLatest(latest) {
@@ -354,7 +364,12 @@ function appendLatest(latest) {
 function updateDetail(latest) {
   if (!latest) return;
   detailTitle.textContent = `Nodo ${latest.id_habitacion}`;
-  detailMeta.textContent = `Ultima medicion: ${formatTimestamp(latest.timestamp_origen)} | Registro: ${latest.id || '--'}`;
+  const freshnessTs = parseTimestamp(latest.timestamp_origen);
+  const freshnessLabel = formatTimestamp(latest.timestamp_origen);
+  const isOnline = freshnessTs ? (Date.now() - freshnessTs) <= ONLINE_WINDOW_MS : false;
+  detailMeta.textContent = isOnline
+    ? `Ultima medicion: ${freshnessLabel} | Registro: ${latest.id || '--'}`
+    : `Sin datos desde: ${freshnessLabel} | Registro: ${latest.id || '--'}`;
   if (detailContext) {
     detailContext.textContent = latest.contexto_hotel || '-';
   }
@@ -380,7 +395,7 @@ async function loadNodesOnce() {
 
 async function loadSeries(id) {
   try {
-    const response = await fetch(`${API_BASE}/nodes/${encodeURIComponent(id)}/series?limit=${MAX_POINTS}`);
+    const response = await fetch(`${API_BASE}/nodes/${encodeURIComponent(id)}/series?recent=1&limit=${MAX_POINTS}`);
     const data = await response.json();
     updateCharts(data.items || []);
   } catch (err) {
@@ -461,7 +476,7 @@ function renderTable(container, headers, rows, columnCount) {
 
   const headerRow = document.createElement('div');
   headerRow.className = `table-row header cols-${columnCount}`;
-  headerRow.style.gridTemplateColumns = `repeat(${columnCount}, minmax(110px, 1fr))`;
+  headerRow.style.gridTemplateColumns = `repeat(${columnCount}, minmax(0, 1fr))`;
   headers.forEach((title) => {
     const cell = document.createElement('span');
     cell.textContent = title;
@@ -472,7 +487,7 @@ function renderTable(container, headers, rows, columnCount) {
   rows.forEach((row) => {
     const rowEl = document.createElement('div');
     rowEl.className = `table-row cols-${columnCount}`;
-    rowEl.style.gridTemplateColumns = `repeat(${columnCount}, minmax(110px, 1fr))`;
+    rowEl.style.gridTemplateColumns = `repeat(${columnCount}, minmax(0, 1fr))`;
     row.forEach((cellValue) => {
       const cell = document.createElement('span');
       cell.textContent = cellValue;
@@ -505,6 +520,22 @@ function renderBreakdown(container, rows, labelFn) {
     item.appendChild(value);
     container.appendChild(item);
   });
+}
+
+function renderPacketLog(series) {
+  if (!packetLog) return;
+
+  const rows = (series || []).map((item) => [
+    formatTimestamp(item.timestamp_origen),
+    formatValue(item.temperatura_c, 'C'),
+    formatValue(item.humedad_pct, '%'),
+    formatValue(item.fosfina_mq135),
+    formatValue(item.co_mq7),
+    item.presencia_pir ? 'Si' : 'No',
+    item.contexto_hotel || '--'
+  ]);
+
+  renderTable(packetLog, ['Fecha', 'Temp', 'Hum', 'PH3', 'CO', 'PIR', 'Contexto'], rows, 7);
 }
 
 function switchTablePanel(target) {
