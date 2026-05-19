@@ -83,8 +83,8 @@ services:
       - NODE_RED_CREDENTIAL_SECRET=${NODE_RED_CREDENTIAL_SECRET:-ciudad-inteligente-secret-2024}
     volumes:
       - nodered_data:/data
-      - ./node-red/flows.json:/seed/flows.json:ro,Z
-      - ./node-red/settings.js:/seed/settings.js:ro,Z
+      - ./docker/node-red/flows.json:/seed/flows.json:ro,Z
+      - ./docker/node-red/settings.js:/seed/settings.js:ro,Z
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:1880 || exit 1"]
       interval: 20s
