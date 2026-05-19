@@ -5,6 +5,7 @@ export type Device = {
   node_type: "hardware" | "simulated";
   description: string | null;
   last_seen_at: string;
+  connection_state: "online" | "offline";
   latest_co_ppm: number | null;
   latest_estado: string | null;
   latest_reading_at: string | null;
@@ -21,6 +22,7 @@ export type Reading = {
 export type Alert = {
   id: number;
   device_id: string;
+  device_timestamp: string;
   alert_ts: string;
   severity: "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   alert_type: string;
@@ -29,6 +31,25 @@ export type Alert = {
   presencia: 0 | 1;
   urgente: 0 | 1;
   ack_status: "PENDING" | "ACKED" | "CLOSED";
+};
+
+export type AlertStreamEvent = {
+  id?: number;
+  device_id: string;
+  device_timestamp: string;
+  alert_ts?: string;
+  severity: Alert["severity"];
+  alert_type: string;
+  message: string;
+  co_ppm: number;
+  presencia: 0 | 1;
+  urgente: 0 | 1;
+  ack_status?: Alert["ack_status"];
+  acked_at?: string | null;
+  estado: string | null;
+  topic?: string;
+  source?: "mqtt" | "database";
+  received_at: string;
 };
 
 export type Summary = {
@@ -93,6 +114,27 @@ export const api = {
   recentCommands: () => request<{ data: Command[] }>("/api/commands/recent?limit=10"),
   ackAlert: (id: number) => request(`/api/alerts/${id}/ack`, { method: "PUT" }),
   closeAlert: (id: number) => request(`/api/alerts/${id}`, { method: "DELETE" }),
+  openAlertStream: (onAlert: (alert: AlertStreamEvent) => void) => {
+    const source = new EventSource(`${API_BASE_URL}/api/alerts/stream`);
+
+    source.addEventListener("open", () => {
+      console.info("[api] alert stream connected");
+    });
+
+    source.addEventListener("alert", (event) => {
+      try {
+        onAlert(JSON.parse((event as MessageEvent<string>).data) as AlertStreamEvent);
+      } catch (error) {
+        console.error("[api] failed to parse alert stream payload", error);
+      }
+    });
+
+    source.addEventListener("error", () => {
+      console.warn("[api] alert stream disconnected, browser will retry");
+    });
+
+    return source;
+  },
   ventilation: (action: "ENCENDER" | "APAGAR") => request("/api/commands/ventilation", {
     method: "POST",
     body: JSON.stringify({ action, reason: "Comando manual desde dashboard React" })

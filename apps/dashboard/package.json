@@ -9,11 +9,14 @@
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
+    "@fontsource/jetbrains-mono": "latest",
+    "@fontsource/space-grotesk": "latest",
     "@vitejs/plugin-react": "latest",
     "vite": "latest",
     "typescript": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "sonner": "latest",
     "recharts": "latest"
   },
   "devDependencies": {

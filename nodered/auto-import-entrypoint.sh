@@ -4,6 +4,8 @@ set -eu
 DATA_DIR="/data"
 SEED_DIR="/opt/fiot-seed"
 SEED_MARKER="${DATA_DIR}/.fiot_seeded"
+SEED_HASH_MARKER="${DATA_DIR}/.fiot_seeded_template.sha256"
+TEMPLATE_PATH="${SEED_DIR}/flows.template.json"
 
 AUTO_IMPORT="${NR_AUTO_IMPORT:-true}"
 FORCE_IMPORT="${NR_FORCE_IMPORT:-false}"
@@ -86,8 +88,15 @@ NODE
 fi
 
 if [ "${AUTO_IMPORT}" = "true" ] || [ "${AUTO_IMPORT}" = "1" ]; then
-  if [ "${FORCE_IMPORT}" = "true" ] || [ "${FORCE_IMPORT}" = "1" ] || [ ! -f "${SEED_MARKER}" ]; then
+  TEMPLATE_HASH="$(node -e 'const fs = require("fs"); const crypto = require("crypto"); const file = process.argv[1]; const data = fs.readFileSync(file); process.stdout.write(crypto.createHash("sha256").update(data).digest("hex"));' "${TEMPLATE_PATH}")"
+  SEEDED_TEMPLATE_HASH=""
+  if [ -f "${SEED_HASH_MARKER}" ]; then
+    SEEDED_TEMPLATE_HASH="$(node -e 'const fs = require("fs"); const file = process.argv[1]; process.stdout.write(fs.readFileSync(file, "utf8").trim());' "${SEED_HASH_MARKER}")"
+  fi
+
+  if [ "${FORCE_IMPORT}" = "true" ] || [ "${FORCE_IMPORT}" = "1" ] || [ ! -f "${SEED_MARKER}" ] || [ "${TEMPLATE_HASH}" != "${SEEDED_TEMPLATE_HASH}" ]; then
     node "${SEED_DIR}/seed-data.js"
+    printf '%s\n' "${TEMPLATE_HASH}" > "${SEED_HASH_MARKER}"
     date -u +"%Y-%m-%dT%H:%M:%SZ" > "${SEED_MARKER}"
     echo "[fiot-nodered] Flow + credentials seeded into /data"
   fi

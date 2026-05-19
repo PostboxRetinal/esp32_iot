@@ -3,7 +3,7 @@ import { Elysia, status as httpStatus, t } from "elysia";
 import type { ExecuteValues } from "mysql2";
 
 import { commandTopic, config } from "./config";
-import { executeStatement, queryRows } from "./db";
+import { executeStatement, queryRows, waitForDatabase } from "./db";
 import { mqttIsConfigured, publishVentilationCommand, type VentilationCommand } from "./mqtt";
 
 type DeviceRow = {
@@ -12,10 +12,13 @@ type DeviceRow = {
   description: string | null;
   created_at: string;
   last_seen_at: string;
+  connection_state: "online" | "offline";
   latest_co_ppm: number | null;
   latest_estado: string | null;
   latest_reading_at: string | null;
 };
+
+const deviceOnlineWindowMs = 90 * 1000;
 
 type ReadingRow = {
   id: number;
@@ -65,6 +68,77 @@ const parsePositiveInt = (rawValue: unknown, fallback: number, max: number) => {
   return Math.min(Math.trunc(parsed), max);
 };
 
+const sseEncoder = new TextEncoder();
+const sseClients = new Set<ReadableStreamDefaultController<Uint8Array>>();
+let alertBroadcastCursor = 0;
+let alertPollTimer: ReturnType<typeof setInterval> | null = null;
+
+const sseHeaders = {
+  "Content-Type": "text/event-stream",
+  "Cache-Control": "no-cache, no-transform",
+  Connection: "keep-alive",
+  "X-Accel-Buffering": "no"
+};
+
+function encodeSseEvent(event: string, data: unknown) {
+  return sseEncoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+}
+
+function broadcastSseEvent(event: string, data: unknown) {
+  for (const controller of sseClients) {
+    try {
+      controller.enqueue(encodeSseEvent(event, data));
+    } catch {
+      sseClients.delete(controller);
+    }
+  }
+}
+
+async function seedAlertBroadcastCursor() {
+  const rows = await queryRows<{ max_id: number }>(`SELECT COALESCE(MAX(id), 0) AS max_id FROM alerts`);
+  alertBroadcastCursor = rows[0]?.max_id || 0;
+}
+
+async function pollNewAlerts() {
+  const rows = await queryRows<AlertRow>(`
+    SELECT id, device_id, device_timestamp, alert_ts, severity, alert_type, message,
+      co_ppm, presencia, urgente, ack_status, acked_at
+    FROM alerts
+    WHERE id > ?
+    ORDER BY id ASC
+    LIMIT 100
+  `, [alertBroadcastCursor]);
+
+  if (rows.length === 0) {
+    return;
+  }
+
+  for (const row of rows) {
+    alertBroadcastCursor = Math.max(alertBroadcastCursor, row.id);
+    const event = {
+      ...row,
+      source: "database" as const,
+      received_at: new Date().toISOString()
+    };
+
+    console.info(`[api] streaming alert ${event.device_id} ${event.severity} ${event.co_ppm}ppm`);
+    broadcastSseEvent("alert", event);
+  }
+}
+
+async function startAlertPoller() {
+  if (alertPollTimer) {
+    return;
+  }
+
+  await seedAlertBroadcastCursor();
+  alertPollTimer = setInterval(() => {
+    void pollNewAlerts().catch((error) => {
+      console.error(`[api] alert poll failed: ${error instanceof Error ? error.message : String(error)}`);
+    });
+  }, 3000);
+}
+
 const corsOrigin = config.corsOrigin === "*"
   ? true
   : config.corsOrigin.split(",").map((origin) => origin.trim()).filter(Boolean);
@@ -92,13 +166,15 @@ const app = new Elysia()
         db = "error";
       }
 
-      return {
+      const payload = {
         ok: db === "ok",
         db,
         mqtt: mqttIsConfigured() ? "configured" : "missing_config",
         command_topic: commandTopic,
         timestamp: new Date().toISOString()
       };
+
+      return db === "ok" ? payload : httpStatus(503, payload);
     })
     .get("/devices", async () => {
       const devices = await queryRows<DeviceRow>(`
@@ -108,6 +184,10 @@ const app = new Elysia()
           d.description,
           d.created_at,
           d.last_seen_at,
+          CASE
+            WHEN d.last_seen_at >= DATE_SUB(NOW(3), INTERVAL 90 SECOND) THEN 'online'
+            ELSE 'offline'
+          END AS connection_state,
           lr.co_ppm AS latest_co_ppm,
           ls.estado AS latest_estado,
           lr.ingested_at AS latest_reading_at
@@ -166,6 +246,33 @@ const app = new Elysia()
         hours: t.Optional(t.String()),
         limit: t.Optional(t.String())
       })
+    })
+    .get("/alerts/stream", ({ request }) => {
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          sseClients.add(controller);
+          controller.enqueue(sseEncoder.encode(`: connected ${new Date().toISOString()}\n\n`));
+
+          const heartbeat = setInterval(() => {
+            try {
+              controller.enqueue(sseEncoder.encode(`: ping ${Date.now()}\n\n`));
+            } catch {
+              clearInterval(heartbeat);
+              sseClients.delete(controller);
+            }
+          }, 25000);
+
+          const cleanup = () => {
+            clearInterval(heartbeat);
+            sseClients.delete(controller);
+            request.signal.removeEventListener("abort", cleanup);
+          };
+
+          request.signal.addEventListener("abort", cleanup, { once: true });
+        }
+      });
+
+      return new Response(stream, { headers: sseHeaders });
     })
     .put("/alerts/:id/ack", async ({ params }) => {
       const result = await executeStatement(`
@@ -372,8 +479,19 @@ const app = new Elysia()
       })
     })
   )
-  .listen(config.port);
+;
 
-console.log(`fiot-garage-api listening on http://0.0.0.0:${app.server?.port}`);
+async function start() {
+  console.log(`[api] Waiting for MariaDB at ${config.mysql.host}:${config.mysql.port}...`);
+  await waitForDatabase(config.api.dbWaitTimeoutMs, config.api.dbWaitIntervalMs);
+  console.log("[api] MariaDB is reachable.");
+
+  await startAlertPoller();
+
+  app.listen(config.port);
+  console.log(`fiot-garage-api listening on http://0.0.0.0:${config.port}`);
+}
+
+await start();
 
 export type App = typeof app;

@@ -56,7 +56,7 @@ services:
     ports:
       - "1880:1880"
     volumes:
-      - nodered_data:/data
+      - nodered_data:/data:U
       - ./include/app_config.h:/opt/fiot-seed/app_config.h:ro,Z
     depends_on:
       - mariadb
@@ -84,6 +84,7 @@ services:
       MQTT_TOPIC_BASE: ${MQTT_TOPIC_BASE:-your_maqiatto_username/fiot/garage}
       MQTT_COMMAND_TOPIC: ${MQTT_COMMAND_TOPIC:-your_maqiatto_username/fiot/garage/commands}
       HARDWARE_DEVICE_ID: ${HARDWARE_DEVICE_ID:-ESP32-GARAGE-CO-001}
+      SIM_DEVICE_ID: ${SIM_DEVICE_ID:-SIM-GARAGE-CO-001}
     ports:
       - "${API_PORT:-3000}:3000"
     depends_on:

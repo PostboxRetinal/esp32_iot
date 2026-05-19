@@ -22,6 +22,25 @@ export async function queryRows<T>(sql: string, params: ExecuteValues[] = []) {
   return rows as T[];
 }
 
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function waitForDatabase(timeoutMs: number, intervalMs: number) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    try {
+      await pool.execute("SELECT 1 AS ok");
+      return;
+    } catch {
+      await sleep(intervalMs);
+    }
+  }
+
+  throw new Error(`Timed out waiting for MariaDB at ${config.mysql.host}:${config.mysql.port}`);
+}
+
 export async function executeStatement(sql: string, params: ExecuteValues[] = []) {
   const [result] = await pool.execute(sql, params);
   return result as ResultSetHeader;

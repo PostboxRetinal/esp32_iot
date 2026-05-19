@@ -31,6 +31,7 @@ El análisis se expone desde ElysiaJS:
 - `GET /api/analytics/summary?hours=24`: promedio, máximo, mínimo, alertas, nodos activos y urgencias.
 - `GET /api/analytics/state-distribution?hours=24`: distribución de estados.
 - `GET /api/analytics/timeseries?device_id=&hours=24`: serie temporal de CO por minuto y nodo.
+- `GET /api/alerts/stream`: canal SSE para alertas MQTT en tiempo real.
 
 Valor para el problema: permite identificar periodos de mayor concentración de CO, validar si hay presencia durante estados críticos y priorizar acciones de ventilación o evacuación.
 
@@ -44,6 +45,7 @@ La API REST está implementada con ElysiaJS en `apps/api`.
 | GET | `/api/devices` | Lista nodos y último estado conocido |
 | GET | `/api/readings/latest?device_id=&limit=` | Últimas lecturas de sensores |
 | GET | `/api/alerts/recent?hours=&limit=` | Alertas recientes |
+| GET | `/api/alerts/stream` | Alertas en tiempo real (SSE) |
 | PUT | `/api/alerts/:id/ack` | Confirmar alerta pendiente |
 | DELETE | `/api/alerts/:id` | Cierre lógico de alerta |
 | GET | `/api/analytics/summary?hours=24` | Resumen analítico |
@@ -66,6 +68,7 @@ El dashboard principal se implementa con Bun + ReactTS en `apps/dashboard`.
 
 - URL local: `http://localhost:5173`
 - Consume exclusivamente la API REST de ElysiaJS.
+- Suscribe alertas en tiempo real vía SSE y las muestra con `sonner`.
 - Presenta métricas actuales, serie temporal de CO, distribución de estados, nodos activos, alertas y controles de ventilación.
 - Enlaza Node-RED en `http://localhost:1880` como plataforma IoT de procesamiento.
 
