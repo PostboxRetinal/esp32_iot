@@ -22,18 +22,24 @@ La limpieza se realiza en Node-RED, función `Normalize + derive state`:
 - valida `device_id`;
 - convierte `co_ppm` a número;
 - normaliza `presencia` a booleano y texto `SI`/`NO`;
+- convierte `raw_co_adc` a número;
 - asigna timestamp cuando falta;
-- recalcula `estado` server-side usando umbrales únicos desde `include/app_config.h`;
-- descarta mensajes inválidos antes de persistir.
+- **recalcula `estado` server-side usando lógica "Dual-Trigger" (OR)**:
+  - Estado `SEGURO`: `co_ppm < CO_SEGURO_MAX_PPM` Y `raw_adc < MQ7_ADC_SEGURO_RAW_MAX`.
+  - Estado `PRECAUCION`: Si `co_ppm` o `raw_adc` superan sus umbrales de SEGURO.
+  - Estado `PELIGRO`: Si `co_ppm` o `raw_adc` superan sus umbrales de PRECAUCION.
+  - Estado `CRITICO`: Si `co_ppm` o `raw_adc` superan sus umbrales de PELIGRO.
+  - Urgencia (`_URGENTE`): Si hay presencia Y (`co_ppm` > URGENTE_PPM O `raw_adc` > URGENTE_RAW).
+-descarta mensajes inválidos antes de persistir.
 
 El análisis se expone desde ElysiaJS:
 
 - `GET /api/analytics/summary?hours=24`: promedio, máximo, mínimo, alertas, nodos activos y urgencias.
 - `GET /api/analytics/state-distribution?hours=24`: distribución de estados.
-- `GET /api/analytics/timeseries?device_id=&hours=24`: serie temporal de CO por minuto y nodo.
+- `GET /api/analytics/timeseries?device_id=&hours=24`: serie temporal de CO por minuto y nodo (incluye `avg_raw_co_adc`).
 - `GET /api/alerts/stream`: canal SSE para alertas MQTT en tiempo real.
 
-Valor para el problema: permite identificar periodos de mayor concentración de CO, validar si hay presencia durante estados críticos y priorizar acciones de ventilación o evacuación.
+Valor para el problema: permite identificar periodos de mayor concentración de CO, validar si hay presencia durante estados críticos y priorizar acciones de ventilación o evacuación. La incorporación de `raw_co_adc` permite verificar eltrigger por cualquiera de los dos sensores.
 
 ## 4. Interfaces REST
 
@@ -68,8 +74,9 @@ El dashboard principal se implementa con Bun + ReactTS en `apps/dashboard`.
 
 - URL local: `http://localhost:5173`
 - Consume exclusivamente la API REST de ElysiaJS.
-- **Alertas en tiempo real**: Suscripción vía SSE (`/api/alerts/stream`), categorizadas por severidad (`INFO`, `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) y mostradas mediante `sonner` con estilos CSS minimalistas.
-- **Estado de nodos**: Cálculo en tiempo real (`online` si `last_seen_at` >= `NOW()` - 90s, caso contrario `offline`).
+- **Alertas en tiempo real**: Suscripción vía SSE (`/api/alerts/stream`), categorizadas por severidad (`INFO`, `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) y mostradas mediante `sonner` con estilos CSS minimalistas. Las alertas incluyen el valor `raw_co_adc` en la descripción.
+- **Estado de nodos**: Cálculo en tiempo real (`online` si `last_seen_at` >= `NOW()` - 90s, caso contrario `offline`). Cada nodo muestra tanto `co_ppm` como `raw_co_adc`.
+- **Métricas**: La tarjeta principal muestra `co_ppm` y `raw_co_adc`. El gráfico de series temporales usa doble eje Y (ppm en cyan, raw ADC en ámbar).
 - **UI**: Diseño "Sleek Minimalist" con Tailwind y Shadcn/UI.
 - Enlaza Node-RED en `http://localhost:1880` como plataforma IoT de procesamiento.
 

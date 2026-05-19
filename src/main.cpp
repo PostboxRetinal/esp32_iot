@@ -157,18 +157,18 @@ void ensureMqttConnection() {
   connectMqtt();
 }
 
-String clasificarEstado(float co_ppm, int pir) {
+String clasificarEstado(float co_ppm, int raw_adc, int pir) {
   String estado;
 
-  if (co_ppm < CO_SEGURO_MAX_PPM) {
+  if (co_ppm < CO_SEGURO_MAX_PPM && raw_adc < MQ7_ADC_SEGURO_RAW_MAX) {
     estado = "SEGURO";
     setRgbLed(0, RGB_BRIGHTNESS, 0);
     ledState = false;
-  } else if (co_ppm < CO_PRECAUCION_MAX_PPM) {
+  } else if (co_ppm < CO_PRECAUCION_MAX_PPM && raw_adc < MQ7_ADC_PRECAUCION_RAW_MAX) {
     estado = "PRECAUCION";
     setRgbLed(RGB_BRIGHTNESS, RGB_BRIGHTNESS, 0);
     ledState = false;
-  } else if (co_ppm < CO_PELIGRO_MAX_PPM) {
+  } else if (co_ppm < CO_PELIGRO_MAX_PPM && raw_adc < MQ7_ADC_PELIGRO_RAW_MAX) {
     estado = "PELIGRO";
     setRgbLed(RGB_BRIGHTNESS, 0, 0);
     ledState = false;
@@ -181,7 +181,7 @@ String clasificarEstado(float co_ppm, int pir) {
     }
   }
 
-  if (pir == 1 && co_ppm > CO_URGENTE_MIN_PPM) {
+  if (pir == 1 && (co_ppm > CO_URGENTE_MIN_PPM || raw_adc > MQ7_ADC_URGENTE_MIN_PPM)) {
     estado += "_URGENTE";
   }
 
@@ -321,7 +321,7 @@ void loop() {
 
   float co_ppm = calcularPPM(rawCO);
   int pir = digitalRead(PIR_PIN);
-  String estado = clasificarEstado(co_ppm, pir);
+  String estado = clasificarEstado(co_ppm, rawCO, pir);
 
   if (now - lastTelemetryMs >= TELEMETRY_PUBLISH_INTERVAL_MS) {
     lastTelemetryMs = now;

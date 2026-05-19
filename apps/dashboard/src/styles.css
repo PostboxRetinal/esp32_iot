@@ -314,6 +314,14 @@ h1 {
   margin-bottom: 16px;
 }
 
+.panel-actions {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .panel-head h2 {
   font-size: 1.1rem;
   font-weight: 700;
@@ -420,6 +428,29 @@ h1 {
   gap: 16px;
   justify-content: space-between;
   padding: 12px;
+}
+
+.node-selectable {
+  appearance: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+  width: 100%;
+}
+
+.node-selectable:hover {
+  border-color: #404040;
+}
+
+.node-selectable:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.node-selectable.selected {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.14);
 }
 
 .row strong {

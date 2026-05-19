@@ -15,6 +15,7 @@
     device_id VARCHAR(64) NOT NULL,
     device_timestamp VARCHAR(40) NOT NULL,
     co_ppm DECIMAL(6,2) NOT NULL,
+    raw_co_adc INT UNSIGNED DEFAULT NULL,
     presencia TINYINT(1) NOT NULL,
     source_topic VARCHAR(160) NOT NULL,
     message_id BIGINT UNSIGNED DEFAULT NULL,

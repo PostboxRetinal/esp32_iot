@@ -12,7 +12,7 @@ import {
   XAxis,
   YAxis
 } from "recharts";
-import { Bell, ExternalLink } from "lucide-react";
+import { Bell, ChevronDown, ExternalLink } from "lucide-react";
 import { Toaster, toast } from "sonner";
 
 import "@fontsource/jetbrains-mono/latin-400.css";
@@ -28,6 +28,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
@@ -60,6 +62,9 @@ const initialData: DashboardData = {
   timeseries: [],
 };
 
+const selectedDeviceStorageKey = "fiot.dashboard.selectedDeviceId";
+const allDevicesValue = "__all__";
+
 const statePalette: Record<string, string> = {
   SEGURO: "#34d399",
   PRECAUCION: "#fbbf24",
@@ -83,7 +88,7 @@ function getStateColor(state: string) {
   return statePalette[state] || "#94a3b8";
 }
 
-type AlertToastLike = Pick<Alert, "device_id" | "device_timestamp" | "severity" | "estado" | "message" | "co_ppm" | "presencia" | "urgente">;
+type AlertToastLike = Pick<Alert, "device_id" | "device_timestamp" | "severity" | "estado" | "message" | "co_ppm" | "raw_co_adc" | "presencia" | "urgente">;
 
 type AlertToastTheme = {
   background: string;
@@ -135,7 +140,7 @@ function alertSignature(alert: AlertToastLike) {
 
 function notifyAlert(alert: AlertToastLike) {
   const title = `${alert.device_id} · ${alert.estado}`;
-  const description = `${alert.message} · ${fmt(alert.co_ppm, " ppm")}`;
+  const description = `${alert.message} · ${fmt(alert.co_ppm, " ppm")} (Raw: ${fmt(alert.raw_co_adc)})`;
   const theme = getAlertToastTheme(alert.severity);
   const toastStyle = {
     background: theme.background,
@@ -199,9 +204,18 @@ function App() {
   const [ackBusyId, setAckBusyId] = useState<number | null>(null);
   const [readAlertIds, setReadAlertIds] = useState<Set<number>>(new Set());
   const [stateChartActiveIndex, setStateChartActiveIndex] = useState<number | null>(null);
+  const [selectedDeviceId, setSelectedDeviceId] = useState(() => {
+    try {
+      return window.localStorage.getItem(selectedDeviceStorageKey) || "";
+    } catch {
+      return "";
+    }
+  });
+  const [reloadTick, setReloadTick] = useState(0);
   const [compactLayout, setCompactLayout] = useState(() => window.innerWidth < 640);
   const seenAlertSignatures = useRef(new Set<string>());
   const hydratedAlerts = useRef(false);
+  const hasLoadedOnce = useRef(false);
 
   useEffect(() => {
     const updateCompactLayout = () => setCompactLayout(window.innerWidth < 640);
@@ -211,6 +225,14 @@ function App() {
 
     return () => window.removeEventListener("resize", updateCompactLayout);
   }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(selectedDeviceStorageKey, selectedDeviceId);
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [selectedDeviceId, reloadTick]);
 
   function handleAlert(alert: AlertToastLike) {
     const signature = alertSignature(alert);
@@ -223,68 +245,119 @@ function App() {
     console.info(`[dashboard] alert toast ${alert.device_id} ${alert.severity} ${alert.co_ppm}ppm`);
   }
 
-  async function load() {
-    try {
-      const [health, devices, readings, alerts, summary, states, timeseries] = await Promise.all([
-        api.health(),
-        api.devices(),
-        api.latestReadings(40),
-        api.recentAlerts(24, 20),
-        api.summary(24),
-        api.stateDistribution(24),
-        api.timeseries(24),
-      ]);
+  useEffect(() => {
+    let active = true;
+    let completedThisCycle = false;
+    let failedThisCycle = false;
 
-      setData({
-        health,
-        devices: devices.data,
-        readings: readings.data,
-        alerts: alerts.data,
-        summary,
-        states: states.data,
-        timeseries: timeseries.data,
-      });
-
-      if (!hydratedAlerts.current) {
-        for (const alert of alerts.data) {
-          seenAlertSignatures.current.add(alertSignature(alert));
+    async function refresh() {
+      try {
+        if (!hasLoadedOnce.current) {
+          setLoading(true);
         }
 
-        hydratedAlerts.current = true;
-      } else {
-        for (const alert of alerts.data) {
-          handleAlert(alert);
+        const [health, devices] = await Promise.all([
+          api.health(),
+          api.devices()
+        ]);
+
+        if (!active) {
+          return;
+        }
+
+        const liveSelectedDeviceId = selectedDeviceId
+          ? devices.data.some((device) => device.device_id === selectedDeviceId)
+            ? selectedDeviceId
+            : ""
+          : "";
+
+        if (selectedDeviceId && !liveSelectedDeviceId) {
+          setSelectedDeviceId("");
+          return;
+        }
+
+        const scopeDeviceId = liveSelectedDeviceId || undefined;
+        const [readings, alerts, summary, states, timeseries] = await Promise.all([
+          api.latestReadings(40, scopeDeviceId),
+          api.recentAlerts(24, 20, scopeDeviceId),
+          api.summary(24, scopeDeviceId),
+          api.stateDistribution(24, scopeDeviceId),
+          api.timeseries(24, scopeDeviceId)
+        ]);
+
+        if (!active) {
+          return;
+        }
+
+        setData({
+          health,
+          devices: devices.data,
+          readings: readings.data,
+          alerts: alerts.data,
+          summary,
+          states: states.data,
+          timeseries: timeseries.data,
+        });
+
+        if (!hydratedAlerts.current) {
+          for (const alert of alerts.data) {
+            seenAlertSignatures.current.add(alertSignature(alert));
+          }
+
+          hydratedAlerts.current = true;
+        } else {
+          for (const alert of alerts.data) {
+            handleAlert(alert);
+          }
+        }
+
+        setError(null);
+        completedThisCycle = true;
+      } catch (err) {
+        if (!active) {
+          return;
+        }
+
+        failedThisCycle = true;
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (!active) {
+          return;
+        }
+
+        if (!hasLoadedOnce.current && (completedThisCycle || failedThisCycle)) {
+          setLoading(false);
+          hasLoadedOnce.current = true;
         }
       }
-
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
     }
-  }
 
-  useEffect(() => {
-    void load();
-    const interval = window.setInterval(() => void load(), 10000);
-    return () => window.clearInterval(interval);
-  }, []);
+    seenAlertSignatures.current.clear();
+    hydratedAlerts.current = false;
+    void refresh();
 
-  useEffect(() => {
+    const interval = window.setInterval(() => void refresh(), 10000);
     const source = api.openAlertStream((alert) => {
+      if (selectedDeviceId && alert.device_id !== selectedDeviceId) {
+        return;
+      }
+
       handleAlert(alert);
-      void load();
+      void refresh();
     });
 
-    return () => source.close();
-  }, []);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      source.close();
+    };
+  }, [selectedDeviceId]);
 
   async function sendVentilation(action: "ENCENDER" | "APAGAR") {
     setCommandBusy(true);
     try {
       await api.ventilation(action);
-      await load();
+      setReloadTick((tick) => tick + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -296,7 +369,7 @@ function App() {
     setAckBusyId(alert.id);
     try {
       await api.ackAlert(alert.id);
-      await load();
+      setReloadTick((tick) => tick + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -305,6 +378,11 @@ function App() {
   }
 
   const latest = data.readings[0];
+  const selectedDevice = selectedDeviceId
+    ? data.devices.find((device) => device.device_id === selectedDeviceId) ?? null
+    : null;
+  const selectedScopeLabel = selectedDevice?.device_id || "Todos los nodos";
+  const selectorValue = selectedDevice ? selectedDeviceId : allDevicesValue;
   const summary = data.summary;
   const series = [...data.timeseries].slice(-80).map((point) => ({
     ...point,
@@ -399,7 +477,7 @@ function App() {
                       <div className="flex items-start justify-between gap-3 rounded-lg border border-[var(--muted)] bg-[#000000] p-3" key={alert.id}>
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-[var(--foreground)]">{alert.estado}</p>
-                          <p className="mt-1 text-xs text-[var(--muted-foreground)]">{alert.device_id} · {alert.co_ppm} ppm</p>
+                          <p className="mt-1 text-xs text-[var(--muted-foreground)]">{alert.device_id} · {alert.co_ppm} ppm (Raw: {fmt(alert.raw_co_adc)})</p>
                           <p className="text-xs text-[var(--muted-foreground)]">{alert.message}</p>
                           <p className="mt-2 font-mono text-[0.7rem] text-[#525252]">{new Date(alert.alert_ts).toLocaleString()}</p>
                         </div>
@@ -436,7 +514,7 @@ function App() {
       <section className="metrics">
         <Card className="metric primary">
           <span>Nivel de Monóxido de Carbono (CO) actual</span>
-          <strong>{fmt(latest?.co_ppm, " ppm")}</strong>
+          <strong>{fmt(latest?.co_ppm, " ppm")} <span className="ml-2 text-xs font-normal opacity-50">Raw: {fmt(latest?.raw_co_adc)}</span></strong>
           <small>{latest?.device_id || "sin lecturas"}</small>
         </Card>
         <Card className="metric">
@@ -459,17 +537,19 @@ function App() {
       <section className="grid two">
         <Card className="panel chart-panel">
           <div className="panel-head">
-            <h2>Nivel de Monóxido de Carbono (CO) por minuto (ppm)</h2>
-            <span>últimas 24h</span>
+            <h2>Nivel de Monóxido de Carbono (CO) / raw ADC por minuto</h2>
+            <span>últimas 24h · {selectedScopeLabel}</span>
           </div>
           <ResponsiveContainer width="100%" height={lineChartHeight}>
             <LineChart data={series}>
               <CartesianGrid stroke="#243041" strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="label" stroke="#94a3b8" minTickGap={28} tickLine={false} axisLine={false} />
-              <YAxis stroke="#94a3b8" tickLine={false} axisLine={false} />
+              <YAxis yAxisId="left" stroke="#94a3b8" tickLine={false} axisLine={false} />
+              <YAxis yAxisId="raw" orientation="right" stroke="#f59e0b" tickLine={false} axisLine={false} tickFormatter={(value) => `${Math.round(Number(value))}`} />
               <Tooltip contentStyle={{ background: "#111827", border: "1px solid #243041", borderRadius: 12 }} />
-              <Line type="monotone" dataKey="avg_co_ppm" name="CO promedio (ppm)" stroke="#38bdf8" strokeWidth={2.5} dot={false} />
-              <Line type="monotone" dataKey="max_co_ppm" name="CO max (ppm)" stroke="#fb7185" strokeWidth={2} dot={false} />
+              <Line yAxisId="left" type="monotone" dataKey="avg_co_ppm" name="CO promedio (ppm)" stroke="#38bdf8" strokeWidth={2.5} dot={false} />
+              <Line yAxisId="left" type="monotone" dataKey="max_co_ppm" name="CO max (ppm)" stroke="#fb7185" strokeWidth={2} dot={false} />
+              <Line yAxisId="raw" type="monotone" dataKey="avg_raw_co_adc" name="Raw CO (ADC)" stroke="#f59e0b" strokeWidth={1.8} strokeDasharray="6 4" dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </Card>
@@ -477,7 +557,7 @@ function App() {
         <Card className="panel chart-panel">
           <div className="panel-head">
             <h2>Distribución de estados</h2>
-            <span>clasificación server-side</span>
+            <span>clasificación server-side · {selectedScopeLabel}</span>
           </div>
           {stateChartData.length > 0 ? (
             <div className="state-chart-shell">
@@ -550,16 +630,69 @@ function App() {
         <Card className="panel">
           <div className="panel-head">
             <h2>Nodos</h2>
-            <Button asChild className="gap-2 border-cyan-400/50 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/20 hover:text-cyan-50" size="sm" variant="outline">
-              <a href="http://localhost:1880" target="_blank" rel="noreferrer">
-                Abrir Node-RED
-                <ExternalLink className="h-3.5 w-3.5" />
-              </a>
-            </Button>
+            <div className="panel-actions">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    className="gap-2 border-cyan-400/60 bg-[#121212] text-white hover:bg-[#1a1a1a] hover:text-white data-[state=open]:bg-[#1a1a1a]"
+                    size="sm"
+                    variant="outline"
+                  >
+                    <span className="max-w-[11rem] truncate">{selectedScopeLabel}</span>
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[min(24rem,calc(100vw-1rem))] border-[var(--border)] bg-[var(--popover)] p-2 text-[var(--popover-foreground)] shadow-none">
+                  <DropdownMenuLabel className="p-0 px-2 pt-1 text-sm font-semibold text-white">Seleccionar nodo</DropdownMenuLabel>
+                  <p className="px-2 pb-2 pt-1 text-xs text-slate-300">Las opciones salen de `GET /api/devices` en vivo.</p>
+                  <DropdownMenuSeparator className="my-1 bg-[var(--border)]" />
+                  <ScrollArea className="h-64 pr-2">
+                    <DropdownMenuRadioGroup
+                      value={selectorValue}
+                      onValueChange={(value) => setSelectedDeviceId(value === allDevicesValue ? "" : value)}
+                    >
+                      <DropdownMenuRadioItem className="items-start py-2" value={allDevicesValue}>
+                        <div className="flex min-w-0 flex-col items-start gap-0.5">
+                          <span className="font-medium text-white">Todos los nodos</span>
+                          <span className="text-xs text-slate-300">Vista global</span>
+                        </div>
+                      </DropdownMenuRadioItem>
+                      {data.devices.map((device) => (
+                        <DropdownMenuRadioItem className="items-start py-2" key={device.device_id} value={device.device_id}>
+                          <div className="flex min-w-0 flex-col items-start gap-0.5">
+                            <span className="truncate font-medium text-white">{device.device_id}</span>
+                            <span className="flex items-center gap-2 text-xs text-slate-300">
+                              <span className={`node-state-dot ${device.connection_state}`} />
+                              <span>{device.connection_state}</span>
+                              <span>·</span>
+                              <span>{device.node_type}</span>
+                              <span>·</span>
+                              <span>{fmt(device.latest_co_ppm, " ppm")} · Raw: {fmt(device.latest_raw_co_adc)}</span>
+                            </span>
+                          </div>
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </ScrollArea>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button asChild className="gap-2 border-cyan-400/50 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/20 hover:text-cyan-50" size="sm" variant="outline">
+                <a href="http://localhost:1880" target="_blank" rel="noreferrer">
+                  Abrir Node-RED
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </Button>
+            </div>
           </div>
           <div className="list">
             {data.devices.map((device) => (
-              <div className={`row node ${device.connection_state}`} key={device.device_id}>
+              <button
+                aria-pressed={selectedDeviceId === device.device_id}
+                className={`row node node-selectable ${device.connection_state}${selectedDeviceId === device.device_id ? " selected" : ""}`}
+                key={device.device_id}
+                onClick={() => setSelectedDeviceId(device.device_id)}
+                type="button"
+              >
                 <div>
                   <strong>{device.device_id}</strong>
                   <small>{device.node_type} · {device.latest_estado || "sin estado"}</small>
@@ -571,8 +704,8 @@ function App() {
                     · last seen {formatLastSeen(device.last_seen_at)}
                   </small>
                 </div>
-                <span>{fmt(device.latest_co_ppm, " ppm")}</span>
-              </div>
+                <span>{fmt(device.latest_co_ppm, " ppm")} <small className="ml-1 opacity-50">({fmt(device.latest_raw_co_adc)})</small></span>
+              </button>
             ))}
           </div>
         </Card>

@@ -14,6 +14,7 @@ type DeviceRow = {
   last_seen_at: string;
   connection_state: "online" | "offline";
   latest_co_ppm: number | null;
+  latest_raw_co_adc: number | null;
   latest_estado: string | null;
   latest_reading_at: string | null;
 };
@@ -25,6 +26,7 @@ type ReadingRow = {
   device_id: string;
   device_timestamp: string;
   co_ppm: number;
+  raw_co_adc: number | null;
   presencia: 0 | 1;
   source_topic: string;
   message_id: number | null;
@@ -40,6 +42,7 @@ type AlertRow = {
   estado: string;
   message: string;
   co_ppm: number;
+  raw_co_adc: number | null;
   presencia: 0 | 1;
   urgente: 0 | 1;
   ack_status: "PENDING" | "ACKED" | "CLOSED";
@@ -102,7 +105,7 @@ async function seedAlertBroadcastCursor() {
 async function pollNewAlerts() {
   const rows = await queryRows<AlertRow>(`
     SELECT id, device_id, device_timestamp, alert_ts, severity, estado, message,
-      co_ppm, presencia, urgente, ack_status, acked_at
+      co_ppm, raw_co_adc, presencia, urgente, ack_status, acked_at
     FROM alerts
     WHERE id > ?
     ORDER BY id ASC
@@ -189,6 +192,7 @@ const app = new Elysia()
             ELSE 'offline'
           END AS connection_state,
           lr.co_ppm AS latest_co_ppm,
+          lr.raw_co_adc AS latest_raw_co_adc,
           ls.estado AS latest_estado,
           lr.ingested_at AS latest_reading_at
         FROM devices d
@@ -214,7 +218,7 @@ const app = new Elysia()
 
       params.push(limit);
       const rows = await queryRows<ReadingRow>(`
-        SELECT id, device_id, device_timestamp, co_ppm, presencia, source_topic, message_id, ingested_at
+        SELECT id, device_id, device_timestamp, co_ppm, raw_co_adc, presencia, source_topic, message_id, ingested_at
         FROM sensor_readings
         ${where}
         ORDER BY id DESC
@@ -231,20 +235,32 @@ const app = new Elysia()
     .get("/alerts/recent", async ({ query }) => {
       const hours = parsePositiveInt(query.hours, 24, 720);
       const limit = parsePositiveInt(query.limit, 50, 500);
+      const deviceId = String(query.device_id || "").trim();
+      const params: ExecuteValues[] = [hours];
+      let deviceFilter = "";
+
+      if (deviceId) {
+        deviceFilter = " AND device_id = ?";
+        params.push(deviceId);
+      }
+
+      params.push(limit);
       const rows = await queryRows<AlertRow>(`
         SELECT id, device_id, device_timestamp, alert_ts, severity, estado, message,
-          co_ppm, presencia, urgente, ack_status, acked_at
+          co_ppm, raw_co_adc, presencia, urgente, ack_status, acked_at
         FROM alerts
         WHERE alert_ts >= DATE_SUB(NOW(3), INTERVAL ? HOUR)
+        ${deviceFilter}
         ORDER BY alert_ts DESC
         LIMIT ?
-      `, [hours, limit]);
+      `, params);
 
       return { hours, data: rows };
     }, {
       query: t.Object({
         hours: t.Optional(t.String()),
-        limit: t.Optional(t.String())
+        limit: t.Optional(t.String()),
+        device_id: t.Optional(t.String())
       })
     })
     .get("/alerts/stream", ({ request }) => {
@@ -306,6 +322,21 @@ const app = new Elysia()
     })
     .get("/analytics/summary", async ({ query }) => {
       const hours = parsePositiveInt(query.hours, 24, 720);
+      const deviceId = String(query.device_id || "").trim();
+      const readingsParams: ExecuteValues[] = [hours];
+      const alertsParams: ExecuteValues[] = [hours];
+      const statesParams: ExecuteValues[] = [hours];
+      const readingsDeviceFilter = deviceId ? " AND device_id = ?" : "";
+      const alertsDeviceFilter = deviceId ? " AND device_id = ?" : "";
+      const statesDeviceFilter = deviceId ? " AND device_id = ?" : "";
+      const devicesWhere = deviceId ? "WHERE device_id = ?" : "";
+
+      if (deviceId) {
+        readingsParams.push(deviceId);
+        alertsParams.push(deviceId);
+        statesParams.push(deviceId);
+      }
+
       const [readings, alerts, states, devices] = await Promise.all([
         queryRows<{
           total_readings: number;
@@ -319,7 +350,8 @@ const app = new Elysia()
             MIN(co_ppm) AS min_co_ppm
           FROM sensor_readings
           WHERE ingested_at >= DATE_SUB(NOW(3), INTERVAL ? HOUR)
-        `, [hours]),
+          ${readingsDeviceFilter}
+        `, readingsParams),
         queryRows<{
           total_alerts: number;
           critical_alerts: number;
@@ -330,17 +362,20 @@ const app = new Elysia()
             SUM(ack_status = 'PENDING') AS pending_alerts
           FROM alerts
           WHERE alert_ts >= DATE_SUB(NOW(3), INTERVAL ? HOUR)
-        `, [hours]),
+          ${alertsDeviceFilter}
+        `, alertsParams),
         queryRows<{ urgent_events: number }>(`
           SELECT SUM(urgente = 1) AS urgent_events
           FROM state_events
           WHERE ingested_at >= DATE_SUB(NOW(3), INTERVAL ? HOUR)
-        `, [hours]),
+          ${statesDeviceFilter}
+        `, statesParams),
         queryRows<{ total_devices: number; active_devices: number }>(`
           SELECT COUNT(*) AS total_devices,
             SUM(last_seen_at >= DATE_SUB(NOW(3), INTERVAL ? HOUR)) AS active_devices
           FROM devices
-        `, [hours])
+          ${devicesWhere}
+        `, deviceId ? [hours, deviceId] : [hours])
       ]);
 
       return {
@@ -365,21 +400,31 @@ const app = new Elysia()
         }
       };
     }, {
-      query: t.Object({ hours: t.Optional(t.String()) })
+      query: t.Object({ hours: t.Optional(t.String()), device_id: t.Optional(t.String()) })
     })
     .get("/analytics/state-distribution", async ({ query }) => {
       const hours = parsePositiveInt(query.hours, 24, 720);
+      const deviceId = String(query.device_id || "").trim();
+      const params: ExecuteValues[] = [hours];
+      let deviceFilter = "";
+
+      if (deviceId) {
+        deviceFilter = " AND device_id = ?";
+        params.push(deviceId);
+      }
+
       const rows = await queryRows<{ estado: string; total: number }>(`
         SELECT estado, COUNT(*) AS total
         FROM state_events
         WHERE ingested_at >= DATE_SUB(NOW(3), INTERVAL ? HOUR)
+          ${deviceFilter}
         GROUP BY estado
         ORDER BY total DESC
-      `, [hours]);
+      `, params);
 
       return { hours, data: rows };
     }, {
-      query: t.Object({ hours: t.Optional(t.String()) })
+      query: t.Object({ hours: t.Optional(t.String()), device_id: t.Optional(t.String()) })
     })
     .get("/analytics/timeseries", async ({ query }) => {
       const hours = parsePositiveInt(query.hours, 24, 720);
@@ -397,6 +442,7 @@ const app = new Elysia()
         device_id: string;
         avg_co_ppm: number;
         max_co_ppm: number;
+        avg_raw_co_adc: number | null;
         presencia_count: number;
         samples: number;
       }>(`
@@ -404,6 +450,7 @@ const app = new Elysia()
           device_id,
           ROUND(AVG(co_ppm), 2) AS avg_co_ppm,
           MAX(co_ppm) AS max_co_ppm,
+          ROUND(AVG(raw_co_adc), 0) AS avg_raw_co_adc,
           SUM(presencia = 1) AS presencia_count,
           COUNT(*) AS samples
         FROM sensor_readings

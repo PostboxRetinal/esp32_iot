@@ -7,6 +7,7 @@ export type Device = {
   last_seen_at: string;
   connection_state: "online" | "offline";
   latest_co_ppm: number | null;
+  latest_raw_co_adc: number | null;
   latest_estado: string | null;
   latest_reading_at: string | null;
 };
@@ -15,6 +16,7 @@ export type Reading = {
   id: number;
   device_id: string;
   co_ppm: number;
+  raw_co_adc: number | null;
   presencia: 0 | 1;
   ingested_at: string;
 };
@@ -28,6 +30,7 @@ export type Alert = {
   estado: string;
   message: string;
   co_ppm: number;
+  raw_co_adc: number | null;
   presencia: 0 | 1;
   urgente: 0 | 1;
   ack_status: "PENDING" | "ACKED" | "CLOSED";
@@ -42,6 +45,7 @@ export type AlertStreamEvent = {
   estado: string;
   message: string;
   co_ppm: number;
+  raw_co_adc: number | null;
   presencia: 0 | 1;
   urgente: 0 | 1;
   ack_status?: Alert["ack_status"];
@@ -69,6 +73,7 @@ export type TimeseriesPoint = {
   device_id: string;
   avg_co_ppm: number;
   max_co_ppm: number;
+  avg_raw_co_adc: number | null;
   presencia_count: number;
   samples: number;
 };
@@ -101,15 +106,30 @@ async function request<T>(path: string, init?: RequestInit) {
   return response.json() as Promise<T>;
 }
 
+function withQuery(path: string, params: Record<string, string | number | undefined>) {
+  const searchParams = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value == null || value === "") {
+      continue;
+    }
+
+    searchParams.set(key, String(value));
+  }
+
+  const query = searchParams.toString();
+  return query ? `${path}?${query}` : path;
+}
+
 export const api = {
   baseUrl: API_BASE_URL,
   health: () => request<{ ok: boolean; db: string; mqtt: string; timestamp: string }>("/api/health"),
   devices: () => request<{ data: Device[] }>("/api/devices"),
-  latestReadings: (limit = 30) => request<{ data: Reading[] }>(`/api/readings/latest?limit=${limit}`),
-  recentAlerts: (hours = 24, limit = 20) => request<{ data: Alert[] }>(`/api/alerts/recent?hours=${hours}&limit=${limit}`),
-  summary: (hours = 24) => request<Summary>(`/api/analytics/summary?hours=${hours}`),
-  stateDistribution: (hours = 24) => request<{ data: StateDistribution[] }>(`/api/analytics/state-distribution?hours=${hours}`),
-  timeseries: (hours = 24) => request<{ data: TimeseriesPoint[] }>(`/api/analytics/timeseries?hours=${hours}`),
+  latestReadings: (limit = 30, deviceId?: string) => request<{ data: Reading[] }>(withQuery("/api/readings/latest", { limit, device_id: deviceId })),
+  recentAlerts: (hours = 24, limit = 20, deviceId?: string) => request<{ data: Alert[] }>(withQuery("/api/alerts/recent", { hours, limit, device_id: deviceId })),
+  summary: (hours = 24, deviceId?: string) => request<Summary>(withQuery("/api/analytics/summary", { hours, device_id: deviceId })),
+  stateDistribution: (hours = 24, deviceId?: string) => request<{ data: StateDistribution[] }>(withQuery("/api/analytics/state-distribution", { hours, device_id: deviceId })),
+  timeseries: (hours = 24, deviceId?: string) => request<{ data: TimeseriesPoint[] }>(withQuery("/api/analytics/timeseries", { hours, device_id: deviceId })),
   recentCommands: () => request<{ data: Command[] }>("/api/commands/recent?limit=10"),
   ackAlert: (id: number) => request(`/api/alerts/${id}/ack`, { method: "PUT" }),
   closeAlert: (id: number) => request(`/api/alerts/${id}`, { method: "DELETE" }),

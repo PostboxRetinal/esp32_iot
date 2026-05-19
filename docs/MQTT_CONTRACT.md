@@ -30,6 +30,7 @@
   "severity": "HIGH",
   "message": "CO crítico sin presencia detectada.",
   "co_ppm": 32.7,
+  "raw_co_adc": 3270,
   "presencia": "NO",
   "estado": "CRITICO",
   "urgente": 0
@@ -43,6 +44,7 @@
   "device_id": "ESP32-GARAGE-CO-001",
   "timestamp": "2026-04-14T10:23:45-05:00",
   "co_ppm": 18.4,
+  "raw_co_adc": 1840,
   "presencia": "SI",
   "estado": "PELIGRO"
 }
