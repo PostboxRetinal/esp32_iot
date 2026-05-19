@@ -6,11 +6,11 @@ Este documento mapea los requerimientos de `Parcial3-FIoT-2026-01.pdf` con la im
 
 - Nodo real: `ESP32-GARAGE-CO-001`, firmware PlatformIO para ESP32-S3 N16R8 en `src/main.cpp`.
 - Nodo simulado: `SIM-GARAGE-CO-001`, generado por el flujo Node-RED en `nodered/flows.json`.
-- Ambos publican telemetría MQTT bajo `MQTT_TOPIC_BASE` y Node-RED persiste los datos en MariaDB.
+- Ambos publican telemetría MQTT en `MQTT_TOPIC_BASE/telemetry` y Node-RED persiste los datos en MariaDB.
 
 ## 2. Plataforma IoT operativa
 
-- Node-RED ingesta telemetría MQTT, normaliza mensajes, recalcula estado, genera alertas y audita comandos.
+- Node-RED ingesta telemetría MQTT compartida, normaliza mensajes, recalcula estado, genera alertas y audita comandos.
 - MariaDB almacena dispositivos, lecturas, eventos de estado, alertas y comandos.
 - ElysiaJS expone la información por REST para aplicaciones externas.
 - ReactTS consume la API y presenta un dashboard web.

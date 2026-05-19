@@ -28,7 +28,7 @@ char topicStatus[96];
 char topicHeartbeat[96];
 
 void buildTopics() {
-  snprintf(topicTelemetry, sizeof(topicTelemetry), "%s/%s/telemetry", MQTT_TOPIC_BASE, DEVICE_ID);
+  snprintf(topicTelemetry, sizeof(topicTelemetry), "%s/telemetry", MQTT_TOPIC_BASE);
   snprintf(topicStatus, sizeof(topicStatus), "%s/%s/status", MQTT_TOPIC_BASE, DEVICE_ID);
   snprintf(topicHeartbeat, sizeof(topicHeartbeat), "%s/%s/heartbeat", MQTT_TOPIC_BASE, DEVICE_ID);
 }

@@ -2,22 +2,24 @@
 
 ## Raíz de tópicos
 
-`<maqiatto_user>/fiot/garage/<device_id>/...`
+`<maqiatto_user>/fiot/garage`
 
 ## Tópicos principales
 
-- `<maqiatto_user>/fiot/garage/<device_id>/telemetry`
+- `<maqiatto_user>/fiot/garage/telemetry`
   - Publicador: ESP32 hardware y nodo simulado
   - Suscriptor: Node-RED
+  - `device_id` distingue el nodo dentro del payload
 - `<maqiatto_user>/fiot/garage/<device_id>/heartbeat`
   - Publicador: ESP32 hardware
   - Suscriptor: Node-RED/monitoring
 - `<maqiatto_user>/fiot/garage/<device_id>/status`
   - Publicador: ESP32 (online/offline retained + LWT)
   - Suscriptor: Node-RED/monitoring
-- `<maqiatto_user>/fiot/garage/alerts/<device_id>`
+- `<maqiatto_user>/fiot/garage/alerts`
   - Publicador: Node-RED
   - Suscriptor: dashboard/notificaciones
+  - `device_id` distingue el nodo dentro del payload
 
 ## Payload de telemetría (requerido)
 

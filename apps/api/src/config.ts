@@ -31,7 +31,6 @@ export const config = {
 
 export const commandTopic = config.mqtt.commandTopic || `${config.mqtt.topicBase}/commands`;
 export const alertTopics = [
-  `${config.mqtt.topicBase}/alerts/${config.hardwareDeviceId}`,
-  `${config.mqtt.topicBase}/alerts/${config.simDeviceId}`
-].filter((topic, index, topics) => topics.indexOf(topic) === index);
-export const alertTopicPrefix = `${config.mqtt.topicBase}/alerts/`;
+  `${config.mqtt.topicBase}/alerts`
+];
+export const alertTopicPrefix = `${config.mqtt.topicBase}/alerts`;
