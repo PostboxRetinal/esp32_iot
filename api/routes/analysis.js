@@ -261,20 +261,7 @@ router.get('/analysis/analisis', async (req, res) => {
 
     const [rows] = await pool.query(
       `
-        SELECT id, id_habitacion, periodo_dias, total_registros,
-               fecha_inicio_analisis, fecha_fin_analisis, fecha_generacion,
-               temp_promedio, temp_mediana, temp_moda, temp_minima, temp_maxima,
-               temp_rango, temp_stddev, temp_varianza, temp_fuera_rango, temp_anomalias,
-               hum_promedio, hum_mediana, hum_moda, hum_minima, hum_maxima,
-               hum_rango, hum_stddev, hum_varianza, hum_fuera_rango, hum_anomalias,
-               fosfina_promedio, fosfina_mediana, fosfina_moda, fosfina_minima,
-               fosfina_maxima, fosfina_rango, fosfina_stddev, fosfina_varianza,
-               fosfina_fuera_rango, fosfina_anomalias,
-               co_promedio, co_mediana, co_moda, co_minima, co_maxima,
-               co_rango, co_stddev, co_varianza, co_fuera_rango, co_anomalias,
-               corr_temp_hum, corr_fosfina_co, distribucion_categorias,
-               patrones_temporales, relaciones_variables, comparacion_periodos,
-               justificacion_analisis, limitaciones
+        SELECT *
         FROM analisis_mediciones
         ${whereSql}
         ORDER BY fecha_generacion DESC, id DESC

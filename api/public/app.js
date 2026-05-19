@@ -116,6 +116,28 @@ function formatInterval(value) {
   return `${num.toLocaleString('es-CO')} ms`;
 }
 
+function formatAnalysisValue(key, value) {
+  if (value === null || value === undefined) return '--';
+
+  if (typeof value === 'object') {
+    return JSON.stringify(value);
+  }
+
+  if (/fecha|timestamp|_at$/i.test(key)) {
+    return formatTimestamp(value);
+  }
+
+  if (typeof value === 'number') {
+    return formatNumber(value);
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? 'Si' : 'No';
+  }
+
+  return String(value);
+}
+
 function getFreshnessTimestamp(node) {
   if (!node) return null;
   // Use ingestion time for online/offline checks; telemetry timestamps can drift.
@@ -533,6 +555,54 @@ function renderBreakdown(container, rows, labelFn) {
   });
 }
 
+function renderAnalysisTable(container, items) {
+  if (!container) return;
+
+  container.className = 'table analysis-table-container';
+  container.innerHTML = '';
+
+  if (!items.length) {
+    container.innerHTML = '<div class="table-empty">Sin datos.</div>';
+    return;
+  }
+
+  const columns = Object.keys(items[0]);
+  const scroller = document.createElement('div');
+  scroller.className = 'analysis-table-scroll';
+
+  const table = document.createElement('table');
+  table.className = 'analysis-full-table';
+
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+  columns.forEach((column) => {
+    const cell = document.createElement('th');
+    cell.textContent = column;
+    headerRow.appendChild(cell);
+  });
+  thead.appendChild(headerRow);
+
+  const tbody = document.createElement('tbody');
+  items.forEach((item) => {
+    const row = document.createElement('tr');
+    columns.forEach((column) => {
+      const value = item[column];
+      const cell = document.createElement('td');
+      if (value && typeof value === 'object') {
+        cell.className = 'json-cell';
+      }
+      cell.textContent = formatAnalysisValue(column, value);
+      row.appendChild(cell);
+    });
+    tbody.appendChild(row);
+  });
+
+  table.appendChild(thead);
+  table.appendChild(tbody);
+  scroller.appendChild(table);
+  container.appendChild(scroller);
+}
+
 function renderPacketLog(series) {
   if (!packetLog) return;
 
@@ -570,7 +640,7 @@ async function loadAnalysis() {
       fetchJson(`${API_BASE}/analysis/incidencias?limit=20`),
       fetchJson(`${API_BASE}/analysis/limpias?limit=20`),
       fetchJson(`${API_BASE}/analysis/brutas?limpio=0&limit=12`),
-      fetchJson(`${API_BASE}/analysis/analisis?limit=20`),
+      fetchJson(`${API_BASE}/analysis/analisis?limit=200`),
       fetchJson(`${API_BASE}/analysis/eventos?limit=20`)
     ]);
 
@@ -630,21 +700,7 @@ async function loadAnalysis() {
     ]);
     renderTable(limpiasTable, ['Habitacion', 'Riesgo', 'Temp', 'Hum', 'PH3', 'CO', 'Fecha'], limpiasRows, 7);
 
-    const analRows = (analData.items || []).map((item) => [
-      item.id_habitacion || '--',
-      formatNumber(item.total_registros),
-      `${formatNumber(item.temp_promedio)} / ${formatNumber(item.temp_rango)}`,
-      `${formatNumber(item.hum_promedio)} / ${formatNumber(item.hum_rango)}`,
-      formatNumber(item.fosfina_promedio),
-      formatNumber(item.co_promedio),
-      formatTimestamp(item.fecha_generacion)
-    ]);
-    renderTable(
-      analisisTable,
-      ['Habitacion', 'Registros', 'Temp prom/rango', 'Hum prom/rango', 'PH3 prom', 'CO prom', 'Generado'],
-      analRows,
-      7
-    );
+    renderAnalysisTable(analisisTable, analData.items || []);
 
     const eventRows = (eventosData.items || []).map((item) => [
       item.id_habitacion,
