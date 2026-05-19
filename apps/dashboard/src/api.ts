@@ -25,7 +25,7 @@ export type Alert = {
   device_timestamp: string;
   alert_ts: string;
   severity: "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-  alert_type: string;
+  estado: string;
   message: string;
   co_ppm: number;
   presencia: 0 | 1;
@@ -39,14 +39,13 @@ export type AlertStreamEvent = {
   device_timestamp: string;
   alert_ts?: string;
   severity: Alert["severity"];
-  alert_type: string;
+  estado: string;
   message: string;
   co_ppm: number;
   presencia: 0 | 1;
   urgente: 0 | 1;
   ack_status?: Alert["ack_status"];
   acked_at?: string | null;
-  estado: string | null;
   topic?: string;
   source?: "mqtt" | "database";
   received_at: string;

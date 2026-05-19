@@ -21,6 +21,21 @@
   - Suscriptor: dashboard/notificaciones
   - `device_id` distingue el nodo dentro del payload
 
+## Payload de alerta (requerido)
+
+```json
+{
+  "device_id": "SIM-GARAGE-CO-001",
+  "timestamp": "2026-05-19T17:18:25.104Z",
+  "severity": "HIGH",
+  "message": "CO crítico sin presencia detectada.",
+  "co_ppm": 32.7,
+  "presencia": "NO",
+  "estado": "CRITICO",
+  "urgente": 0
+}
+```
+
 ## Payload de telemetría (requerido)
 
 ```json
@@ -44,7 +59,7 @@ Campos aceptados adicionales:
 - `timestamp`: string ISO-8601 (si falta, Node-RED usa hora del servidor)
 - `co_ppm`: numérico
 - `presencia`: `SI`/`NO` (o equivalentes booleanos)
-- `estado`: recalculado en servidor para consistencia
+- `estado`: clasificación del evento (`SEGURO`, `PRECAUCION`, `PELIGRO`, `CRITICO`, `CRITICO_URGENTE`)
 
 ## QoS y retención recomendados
 

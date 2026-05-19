@@ -15,12 +15,11 @@ export type AlertNotification = {
   device_id: string;
   device_timestamp: string;
   severity: "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-  alert_type: string;
+  estado: string;
   message: string;
   co_ppm: number;
   presencia: 0 | 1;
   urgente: 0 | 1;
-  estado: string | null;
   topic: string;
   received_at: string;
 };
@@ -66,13 +65,13 @@ function parseAlertMessage(topic: string, payload: Buffer): AlertNotification | 
 
   const data = parsed as Record<string, unknown>;
   const deviceId = typeof data.device_id === "string" ? data.device_id.trim() : "";
-  const alertType = typeof data.alert_type === "string" ? data.alert_type.trim() : "";
+  const estado = typeof data.estado === "string" ? data.estado.trim() : "";
   const message = typeof data.message === "string" ? data.message.trim() : "";
   const severity = typeof data.severity === "string" ? data.severity.trim().toUpperCase() : "";
   const timestamp = typeof data.timestamp === "string" && data.timestamp.trim() ? data.timestamp.trim() : new Date().toISOString();
   const coPpm = Number(data.co_ppm);
 
-  if (!deviceId || !alertType || !message || !Number.isFinite(coPpm)) {
+  if (!deviceId || !estado || !message || !Number.isFinite(coPpm)) {
     return null;
   }
 
@@ -84,12 +83,11 @@ function parseAlertMessage(topic: string, payload: Buffer): AlertNotification | 
     device_id: deviceId,
     device_timestamp: timestamp,
     severity,
-    alert_type: alertType,
+    estado,
     message,
     co_ppm: coPpm,
     presencia: data.presencia === 1 || data.presencia === "SI" || data.presencia === true ? 1 : 0,
     urgente: data.urgente === 1 || data.urgente === true ? 1 : 0,
-    estado: typeof data.estado === "string" ? data.estado : null,
     topic,
     received_at: new Date().toISOString()
   };

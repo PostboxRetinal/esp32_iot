@@ -83,7 +83,7 @@ function getStateColor(state: string) {
   return statePalette[state] || "#94a3b8";
 }
 
-type AlertToastLike = Pick<Alert, "device_id" | "device_timestamp" | "severity" | "alert_type" | "message" | "co_ppm" | "presencia" | "urgente">;
+type AlertToastLike = Pick<Alert, "device_id" | "device_timestamp" | "severity" | "estado" | "message" | "co_ppm" | "presencia" | "urgente">;
 
 type AlertToastTheme = {
   background: string;
@@ -130,11 +130,11 @@ function getAlertToastTheme(severity: Alert["severity"]): AlertToastTheme {
 }
 
 function alertSignature(alert: AlertToastLike) {
-  return [alert.device_id, alert.device_timestamp, alert.severity, alert.alert_type, alert.message, alert.co_ppm, alert.presencia, alert.urgente].join("|");
+  return [alert.device_id, alert.device_timestamp, alert.severity, alert.estado, alert.message, alert.co_ppm, alert.presencia, alert.urgente].join("|");
 }
 
 function notifyAlert(alert: AlertToastLike) {
-  const title = `${alert.device_id} · ${alert.alert_type}`;
+  const title = `${alert.device_id} · ${alert.estado}`;
   const description = `${alert.message} · ${fmt(alert.co_ppm, " ppm")}`;
   const theme = getAlertToastTheme(alert.severity);
   const toastStyle = {
@@ -398,7 +398,7 @@ function App() {
                     {pendingAlerts.map((alert) => (
                       <div className="flex items-start justify-between gap-3 rounded-lg border border-[var(--muted)] bg-[#000000] p-3" key={alert.id}>
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-[var(--foreground)]">{alert.alert_type}</p>
+                          <p className="text-sm font-semibold text-[var(--foreground)]">{alert.estado}</p>
                           <p className="mt-1 text-xs text-[var(--muted-foreground)]">{alert.device_id} · {alert.co_ppm} ppm</p>
                           <p className="text-xs text-[var(--muted-foreground)]">{alert.message}</p>
                           <p className="mt-2 font-mono text-[0.7rem] text-[#525252]">{new Date(alert.alert_ts).toLocaleString()}</p>

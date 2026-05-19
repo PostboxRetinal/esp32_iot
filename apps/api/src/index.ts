@@ -37,7 +37,7 @@ type AlertRow = {
   device_timestamp: string;
   alert_ts: string;
   severity: "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-  alert_type: string;
+  estado: string;
   message: string;
   co_ppm: number;
   presencia: 0 | 1;
@@ -101,7 +101,7 @@ async function seedAlertBroadcastCursor() {
 
 async function pollNewAlerts() {
   const rows = await queryRows<AlertRow>(`
-    SELECT id, device_id, device_timestamp, alert_ts, severity, alert_type, message,
+    SELECT id, device_id, device_timestamp, alert_ts, severity, estado, message,
       co_ppm, presencia, urgente, ack_status, acked_at
     FROM alerts
     WHERE id > ?
@@ -232,7 +232,7 @@ const app = new Elysia()
       const hours = parsePositiveInt(query.hours, 24, 720);
       const limit = parsePositiveInt(query.limit, 50, 500);
       const rows = await queryRows<AlertRow>(`
-        SELECT id, device_id, device_timestamp, alert_ts, severity, alert_type, message,
+        SELECT id, device_id, device_timestamp, alert_ts, severity, estado, message,
           co_ppm, presencia, urgente, ack_status, acked_at
         FROM alerts
         WHERE alert_ts >= DATE_SUB(NOW(3), INTERVAL ? HOUR)

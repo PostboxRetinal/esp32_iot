@@ -52,7 +52,7 @@
     device_timestamp VARCHAR(40) NOT NULL,
     alert_ts TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     severity ENUM('INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL') NOT NULL,
-    alert_type VARCHAR(40) NOT NULL,
+    estado VARCHAR(24) NOT NULL,
     message VARCHAR(255) NOT NULL,
     co_ppm DECIMAL(6,2) NOT NULL,
     presencia TINYINT(1) NOT NULL,
