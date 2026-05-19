@@ -1,6 +1,8 @@
+# Folders
 .pio
 .vscode
 *.pdf
 
 # Ignore environment files with sensitive information
-infrastructure/.env
+include/app_config.h
+.env

@@ -1,16 +1,15 @@
+#include <Arduino.h>
 #include <ArduinoJson.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
+#include <esp32-hal-rgb-led.h>
 #include <math.h>
 #include <time.h>
 
 #include "app_config.h"
 
-#define MQ7_PIN    36
+#define MQ7_PIN    4
 #define PIR_PIN    5
-#define LED_WHITE  27
-#define LED_GREEN  14
-#define LED_RED    16
 
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
@@ -59,21 +58,36 @@ float calcularPPM(int rawValue) {
   return ppm;
 }
 
-void setLED(bool w, bool g, bool r) {
-  digitalWrite(LED_WHITE, w ? HIGH : LOW);
-  digitalWrite(LED_GREEN, g ? HIGH : LOW);
-  digitalWrite(LED_RED,   r ? HIGH : LOW);
+void setRgbLed(uint8_t red, uint8_t green, uint8_t blue) {
+  neopixelWrite(RGB_BUILTIN, red, green, blue);
 }
 
 void runLedSelfTest() {
-  Serial.println("[LED] Self-test: WHITE -> GREEN -> RED");
-  setLED(1, 0, 0);
+  Serial.println("[LED] Self-test: RED -> GREEN -> BLUE");
+  setRgbLed(RGB_BRIGHTNESS, 0, 0);
   delay(LED_SELF_TEST_MS);
-  setLED(0, 1, 0);
+  setRgbLed(0, RGB_BRIGHTNESS, 0);
   delay(LED_SELF_TEST_MS);
-  setLED(0, 0, 1);
+  setRgbLed(0, 0, RGB_BRIGHTNESS);
   delay(LED_SELF_TEST_MS);
-  setLED(0, 0, 0);
+  setRgbLed(0, 0, 0);
+}
+
+void printBoardInfo() {
+  uint32_t flashKb = ESP.getFlashChipSize() / 1024;
+  Serial.printf("[BOARD] Flash: %u KB (%u MB)\n", flashKb, flashKb / 1024);
+  Serial.printf("[BOARD] PSRAM: %u KB total, %u KB free\n", ESP.getPsramSize() / 1024, ESP.getFreePsram() / 1024);
+}
+
+void waitForSerialConsole() {
+#if ARDUINO_USB_CDC_ON_BOOT
+  unsigned long start = millis();
+  while (!Serial && millis() - start < 3000) {
+    delay(10);
+  }
+#else
+  delay(300);
+#endif
 }
 
 String getTimestamp() {
@@ -148,22 +162,22 @@ String clasificarEstado(float co_ppm, int pir) {
 
   if (co_ppm < CO_SEGURO_MAX_PPM) {
     estado = "SEGURO";
-    setLED(1, 0, 0);
+    setRgbLed(0, RGB_BRIGHTNESS, 0);
     ledState = false;
   } else if (co_ppm < CO_PRECAUCION_MAX_PPM) {
     estado = "PRECAUCION";
-    setLED(0, 1, 0);
+    setRgbLed(RGB_BRIGHTNESS, RGB_BRIGHTNESS, 0);
     ledState = false;
   } else if (co_ppm < CO_PELIGRO_MAX_PPM) {
     estado = "PELIGRO";
-    setLED(0, 0, 1);
+    setRgbLed(RGB_BRIGHTNESS, 0, 0);
     ledState = false;
   } else {
     estado = "CRITICO";
     if (millis() - lastBlinkMs >= 150) {
       lastBlinkMs = millis();
       ledState = !ledState;
-      setLED(0, 0, ledState);
+      setRgbLed(ledState ? RGB_BRIGHTNESS : 0, 0, 0);
     }
   }
 
@@ -226,12 +240,12 @@ void publishHeartbeat() {
 
 void setup() {
   Serial.begin(115200);
+  waitForSerialConsole();
+  printBoardInfo();
+
   pinMode(PIR_PIN,   INPUT);
-  pinMode(LED_WHITE, OUTPUT);
-  pinMode(LED_GREEN, OUTPUT);
-  pinMode(LED_RED,   OUTPUT);
   runLedSelfTest();
-  setLED(1, 0, 0);
+  setRgbLed(0, RGB_BRIGHTNESS, 0);
 
   buildTopics();
 

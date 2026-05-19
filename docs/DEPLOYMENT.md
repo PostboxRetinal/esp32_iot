@@ -2,7 +2,7 @@
 
 ## 1) Preparar variables de entorno
 
-1. Copiar y ajustar variables en `infrastructure/.env` (o usar `infrastructure/.env.example` como base).
+1. Copiar y ajustar variables en `.env` (o usar `.env.example` como base).
 2. Mantener IDs de nodos distintos (`HARDWARE_DEVICE_ID` y `SIM_DEVICE_ID`).
 3. Si cambias usuario/clave en `.env`, no necesitas editar `docker-compose.yml` ni `nodered/flows.json`.
 4. Definir `MQTT_TOPIC_BASE` con prefijo de usuario Maqiatto, por ejemplo:
@@ -21,21 +21,23 @@ Desde la raíz del proyecto, iniciar stack:
 
 > Nota: `fiot-nodered` se construye con `nodered/Dockerfile` para dejar preinstalado `node-red-node-mysql` siguiendo el enfoque oficial de imagen personalizada.
 
-Comando recomendado (Podman nativo):
+Comando recomendado (wrapper `podman-compose`):
 
-- `podman-compose --env-file infrastructure/.env -f infrastructure/docker-compose.yml up -d`
+- `source ~/Documents/code/py_venvs/podman_compose/bin/activate`
+
+- `podman-compose --env-file .env -f podman-compose.yml up -d`
 
 Detener y limpiar:
 
-- `podman-compose --env-file infrastructure/.env -f infrastructure/docker-compose.yml down`
+- `podman-compose --env-file .env -f podman-compose.yml down`
 
-> Nota: en algunos sistemas `podman compose` delega a `docker-compose` y requiere socket de Podman. Para evitar ese problema, este proyecto usa `podman-compose` como ruta principal.
+> Nota: en algunos sistemas `podman compose` delega a `docker-compose` y requiere socket de Podman. Para evitar ese problema, este proyecto usa el wrapper `podman-compose` dentro del virtualenv dedicado.
 
 ## 3) Importación automática del flujo (sin pasos manuales)
 
 1. En el primer arranque (volumen `nodered_data` vacío), el contenedor carga automáticamente:
   - `flows.json` en `/data/flows.json`
-  - credenciales MQTT/MySQL en `/data/flows_cred.json` usando variables de `infrastructure/.env`
+  - credenciales MQTT/MySQL en `/data/flows_cred.json` usando variables de `.env`
   - umbrales de CO (`CO_SEGURO_MAX_PPM`, `CO_PRECAUCION_MAX_PPM`, `CO_PELIGRO_MAX_PPM`, `CO_URGENTE_MIN_PPM`) leyendo `include/app_config.h` montado en `/opt/fiot-seed/app_config.h`
   - espera activa de MariaDB antes de iniciar Node-RED para evitar errores de conexión por arranque desfasado
 2. No es necesario importar desde la UI de Node-RED para arrancar el flujo base.

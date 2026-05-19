@@ -95,6 +95,17 @@ function loadThresholdsFromFirmwareHeader(headerPath) {
     return {};
   }
 
+  try {
+    const stat = fs.statSync(headerPath);
+    if (!stat.isFile()) {
+      console.warn(`[fiot-nodered] Firmware header path ${headerPath} is not a file; using environment/default threshold values.`);
+      return {};
+    }
+  } catch (error) {
+    console.warn(`[fiot-nodered] Unable to inspect firmware header at ${headerPath}: ${error.message}; using environment/default threshold values.`);
+    return {};
+  }
+
   const headerContent = fs.readFileSync(headerPath, "utf8");
   const defines = extractDefines(headerContent);
   const resolved = {};

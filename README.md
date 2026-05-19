@@ -4,7 +4,7 @@
 
 Este proyecto implementa una solución IoT híbrida con dos nodos de telemetría:
 
-- **Nodo hardware ESP32 (Wemos D1 R32)**: `ESP32-GARAGE-CO-001`
+- **Nodo hardware ESP32-S3 N16R8**: `ESP32-GARAGE-CO-001`
 - **Nodo simulado (Node-RED)**: `SIM-GARAGE-CO-001`
 
 Ambos publican telemetría de CO/PIR vía MQTT usando Maqiatto como broker externo. Node-RED centraliza procesamiento, clasificación de estados/alertas y persistencia en MySQL/MariaDB.
@@ -85,10 +85,34 @@ Nota de conversión MQ-7:
 
 ## Componentes de despliegue
 
-- `infrastructure/docker-compose.yml`
+- `podman-compose.yml`
   - Orquestado con `podman-compose`
   - `fiot-nodered`
   - `fiot-mariadb`
 - Broker MQTT externo: `maqiatto.com`
 - `nodered/flows.json` (procesamiento y simulación)
 - `database/schema.sql` (modelo relacional)
+
+## Firmware ESP32-S3 N16R8
+
+- Entorno PlatformIO por defecto: `esp32-s3-n16r8-uart`
+- Entorno alternativo USB CDC nativo: `esp32-s3-n16r8-usbcdc`
+- Flash: 16 MB
+- PSRAM: 8 MB OPI
+- LED RGB integrado: `RGB_BUILTIN` / GPIO48
+
+Conexiones usadas por el firmware:
+
+- MQ-7 `AOUT` -> GPIO4 (ADC, max 3.3 V; usar divisor si el modulo entrega 5 V)
+- PIR `OUT` -> GPIO5
+- LED de estado -> RGB integrado de la placa
+
+Evitar GPIO26-GPIO32 porque suelen estar reservados para flash/PSRAM en ESP32-S3 con PSRAM, y evitar GPIO0/GPIO3/GPIO45/GPIO46 para cableado permanente porque son pines de arranque.
+
+Compilar:
+
+```sh
+pio run -e esp32-s3-n16r8-uart
+```
+
+Usar `esp32-s3-n16r8-uart` cuando la placa aparece como USB serial bridge, por ejemplo `USB VID:PID=1A86:55D3` / `USB Single Serial`. Usar `esp32-s3-n16r8-usbcdc` solo si se conecta al USB nativo del ESP32-S3.

@@ -15,7 +15,7 @@ services:
       - "3306:3306"
     volumes:
       - mariadb_data:/var/lib/mysql
-      - ../database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro,Z
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro,Z
     healthcheck:
       test:
         [
@@ -28,7 +28,7 @@ services:
 
   nodered:
     build:
-      context: ../nodered
+      context: ./nodered
       dockerfile: Dockerfile
     image: fiot-nodered:4.1.8-22
     container_name: fiot-nodered
@@ -57,7 +57,7 @@ services:
       - "1880:1880"
     volumes:
       - nodered_data:/data
-      - ../include/app_config.h:/opt/fiot-seed/app_config.h:ro,Z
+      - ./include/app_config.h:/opt/fiot-seed/app_config.h:ro,Z
     depends_on:
       - mariadb
 
