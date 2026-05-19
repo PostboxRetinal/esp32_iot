@@ -1,29 +1,28 @@
 # ESP32 IoT - Calidad de datos y simulador
 
-Este repositorio incluye el flujo de ingestion en Node-RED, la base de datos MySQL y un simulador MQTT para validar reglas de calidad sin hardware.
+Este repositorio incluye el flujo de ingestión en Node-RED, la base de datos MySQL y un simulador MQTT para validar reglas de calidad sin hardware.
 
-La documentacion completa de la pagina web y la API esta en [DOCUMENTACION_WEB_API.md](DOCUMENTACION_WEB_API.md).
+La documentación completa de la página web y la API está en [docs/DOCUMENTACION_WEB_API.md](docs/DOCUMENTACION_WEB_API.md). Para control y pruebas por MQTT, ver [docs/GUIA_ESTADOS_MQTT.md](docs/GUIA_ESTADOS_MQTT.md).
 
 ## Limpieza de datos (Node-RED)
 
 El flujo **HTL-IOT-LIMPIEZA** procesa por demanda lotes de 100 registros con `limpio = 0` y aplica:
-- validacion de registros incompletos
-- deteccion de atipicos
+- validación de registros incompletos
+- detección de atípicos
 - duplicados (batch + cache TTL)
-- reglas temporales (huecos y perdida de comunicacion)
+- reglas temporales (huecos y pérdida de comunicación)
 - homogeneidad de formato
 
-Regla de imputacion:
-- 1-2 columnas con error -> imputacion por mediana (por `id_habitacion`)
+Regla de imputación:
+- 1-2 columnas con error -> imputación por mediana (por `id_habitacion`)
 - >2 columnas con error -> se rechaza y se registra en `incidencias`
-- `mediciones_limpias` no acepta valores `0` en columnas medidas; se tratan como atipicos y se imputan solo con medianas no cero.
+- `mediciones_limpias` no acepta valores `0` en columnas medidas; se tratan como atípicos y se imputan solo con medianas no cero.
 
 Variables de entorno relacionadas (ver `.env`):
 - `TEMP_MIN_C`, `TEMP_MAX_C`, `HUM_MIN_PCT`, `HUM_MAX_PCT`
-- `TEMPORAL_GAP_MAX_MS`, `TEMPORAL_LOSS_MAX_MS`, `TEMPORAL_INTERVALO_DEFAULT_MS`
-- `DUP_SIG_TTL_MS`
+- `MQ135_RAW_MIN`, `MQ135_RAW_MAX`, `MQ7_RAW_MIN`, `MQ7_RAW_MAX`
 
-## Auditoria de datos
+## Auditoría de datos
 
 Consultas recomendadas (ejecutar en MySQL):
 
@@ -68,17 +67,17 @@ FROM mediciones_limpias
 WHERE temperatura_c = 0 OR humedad_pct = 0 OR fosfina_mq135 = 0 OR co_mq7 = 0;
 ```
 
-## Analisis mensual (Node-RED)
+## Análisis mensual (Node-RED)
 
 En el flujo **HTL-IOT-PROCESAMIENTO** hay un inject **ANALISIS MENSUAL (ULTIMO MES)** que ejecuta un
-analisis de 30 dias sobre `mediciones_limpias` y llena la tabla `analisis_mediciones` con:
-- estadistica descriptiva de temperatura, humedad, fosfina y CO,
-- anomalias y valores fuera de rango,
+análisis de 30 días sobre `mediciones_limpias` y llena la tabla `analisis_mediciones` con:
+- estadística descriptiva de temperatura, humedad, fosfina y CO,
+- anomalías y valores fuera de rango,
 - correlaciones, patrones temporales, relaciones entre variables y limitaciones,
-- total de registros y rango de fechas del ultimo mes.
+- total de registros y rango de fechas del último mes.
 
-La web incluye una pestana **Analisis de datos** para consultar resumenes, incidencias, datos limpios, eventos y `analisis_mediciones`. Tambien permite disparar el flujo **LIMPIAR LOTE (100)** de Node-RED desde el boton `Limpiar lote (100)`.
+La web incluye una pestaña **Análisis de datos** para consultar resúmenes, incidencias, datos limpios, eventos y `analisis_mediciones`. También permite disparar los flujos **LIMPIAR LOTE (100)** y el análisis mensual de 30 días desde los controles de la pestaña.
 
 ## Simulador MQTT
 
-El simulador permite validar el flujo sin ESP32. Revisa [simulator/README.md](simulator/README.md) para configuracion y variables de pruebas.
+El simulador permite validar el flujo sin ESP32. Revisa [simulator/README.md](simulator/README.md) para configuración y variables de pruebas, y [docs/GUIA_ESTADOS_MQTT.md](docs/GUIA_ESTADOS_MQTT.md) si necesitas comandos de contexto por MQTT.
