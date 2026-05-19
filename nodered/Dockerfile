@@ -1,4 +1,4 @@
-FROM nodered/node-red:4.1.8-22
+FROM docker.io/nodered/node-red:4.1.8-22
 
 USER root
 
