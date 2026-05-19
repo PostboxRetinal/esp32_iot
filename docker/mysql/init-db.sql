@@ -1,32 +1,83 @@
 CREATE DATABASE IF NOT EXISTS ciudad_inteligente;
 USE ciudad_inteligente;
 
+DROP VIEW IF EXISTS vw_incidencias_medicion;
+DROP VIEW IF EXISTS vw_mediciones_estado;
+DROP PROCEDURE IF EXISTS sp_limpiar_datos_iot;
+
 DROP TABLE IF EXISTS sensores;
+DROP TABLE IF EXISTS analisis_mediciones;
 DROP TABLE IF EXISTS eventos_actuadores;
 DROP TABLE IF EXISTS estados_medicion;
+DROP TABLE IF EXISTS incidencias;
+DROP TABLE IF EXISTS mediciones_limpias;
 DROP TABLE IF EXISTS mediciones_brutas;
 
 CREATE TABLE IF NOT EXISTS mediciones_brutas (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  device_id VARCHAR(100) NOT NULL,
-  habitacion VARCHAR(120) NOT NULL,
+  id_habitacion VARCHAR(120) NOT NULL,
   contexto_hotel VARCHAR(32) NOT NULL,
   temperatura_c DECIMAL(6,2) NULL,
   humedad_pct DECIMAL(6,2) NULL,
   fosfina_mq135 DECIMAL(10,2) NOT NULL,
   co_mq7 DECIMAL(10,2) NOT NULL,
-  ph3_ppm DECIMAL(10,2) NULL,
-  co_ppm DECIMAL(10,2) NULL,
   presencia_pir TINYINT(1) NOT NULL DEFAULT 0,
   intervalo_envio_ms INT NULL,
   timestamp_origen DATETIME NOT NULL,
+  limpio TINYINT(1) NOT NULL DEFAULT 0,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  INDEX idx_med_device_id (device_id),
-  INDEX idx_med_habitacion (habitacion),
+  INDEX idx_med_id_habitacion (id_habitacion),
   INDEX idx_med_contexto (contexto_hotel),
   INDEX idx_med_timestamp_origen (timestamp_origen),
-  INDEX idx_med_created_at (created_at)
+  INDEX idx_med_created_at (created_at),
+  INDEX idx_med_limpio (limpio),
+  CONSTRAINT chk_med_contexto
+    CHECK (contexto_hotel IN ('LIBRE', 'RESERVADA', 'FUMIGACION'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS mediciones_limpias (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  medicion_id BIGINT UNSIGNED NOT NULL,
+  temperatura_c DECIMAL(6,2) NULL,
+  humedad_pct DECIMAL(6,2) NULL,
+  fosfina_mq135 DECIMAL(10,2) NULL,
+  co_mq7 DECIMAL(10,2) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_limpia_medicion (medicion_id),
+  INDEX idx_limpia_medicion (medicion_id),
+  CONSTRAINT fk_limpia_medicion
+    FOREIGN KEY (medicion_id) REFERENCES mediciones_brutas(id)
+    ON DELETE CASCADE,
+  CONSTRAINT chk_limpia_temperatura_no_cero
+    CHECK (temperatura_c IS NULL OR temperatura_c <> 0),
+  CONSTRAINT chk_limpia_humedad_no_cero
+    CHECK (humedad_pct IS NULL OR humedad_pct <> 0),
+  CONSTRAINT chk_limpia_fosfina_no_cero
+    CHECK (fosfina_mq135 IS NULL OR fosfina_mq135 <> 0),
+  CONSTRAINT chk_limpia_co_no_cero
+    CHECK (co_mq7 IS NULL OR co_mq7 <> 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS incidencias (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  medicion_id BIGINT UNSIGNED NOT NULL,
+  id_habitacion VARCHAR(120) NOT NULL,
+  tipo_incidencia VARCHAR(20) NOT NULL,
+  detalle_incidencia VARCHAR(255) NOT NULL,
+  valor_detectado JSON NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  INDEX idx_inc_medicion (medicion_id),
+  INDEX idx_inc_id_habitacion (id_habitacion),
+  INDEX idx_inc_tipo (tipo_incidencia),
+  INDEX idx_inc_created_at (created_at),
+  CONSTRAINT fk_incidencias_medicion
+    FOREIGN KEY (medicion_id) REFERENCES mediciones_brutas(id)
+    ON DELETE CASCADE,
+  CONSTRAINT chk_incidencias_tipo
+    CHECK (tipo_incidencia IN ('OK', 'OBSERVADO', 'ERROR', 'DUPLICADO', 'MULTIPLE', 'INCOMPLETO', 'TEMPORAL', 'FORMATO', 'ATIPICO'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS estados_medicion (
@@ -34,7 +85,6 @@ CREATE TABLE IF NOT EXISTS estados_medicion (
   medicion_id BIGINT UNSIGNED NOT NULL,
   estado_riesgo VARCHAR(20) NOT NULL,
   razon_riesgo VARCHAR(120) NULL,
-  nivel_alerta VARCHAR(255) NULL,
   color_alerta VARCHAR(20) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -51,18 +101,15 @@ CREATE TABLE IF NOT EXISTS estados_medicion (
 CREATE TABLE IF NOT EXISTS eventos_actuadores (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   medicion_id BIGINT UNSIGNED NULL,
-  device_id VARCHAR(100) NOT NULL,
-  habitacion VARCHAR(120) NOT NULL,
+  id_habitacion VARCHAR(120) NOT NULL,
   estado_riesgo VARCHAR(20) NOT NULL,
   contexto_hotel VARCHAR(32) NOT NULL,
   motivo_activacion VARCHAR(255) NOT NULL,
-  comando VARCHAR(32) NOT NULL,
   intervalo_objetivo_ms INT NULL,
   timestamp_origen DATETIME NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  INDEX idx_evt_device_id (device_id),
-  INDEX idx_evt_habitacion (habitacion),
+  INDEX idx_evt_id_habitacion (id_habitacion),
   INDEX idx_evt_estado (estado_riesgo),
   INDEX idx_evt_created_at (created_at),
   CONSTRAINT fk_eventos_medicion
@@ -74,37 +121,112 @@ CREATE TABLE IF NOT EXISTS eventos_actuadores (
     CHECK (contexto_hotel IN ('LIBRE', 'RESERVADA', 'FUMIGACION'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-DROP VIEW IF EXISTS vw_mediciones_estado;
 CREATE VIEW vw_mediciones_estado AS
 SELECT
   m.id,
-  m.device_id,
-  m.habitacion,
+  m.id_habitacion,
   m.contexto_hotel,
   m.temperatura_c,
   m.humedad_pct,
   m.fosfina_mq135,
   m.co_mq7,
-  m.ph3_ppm,
-  m.co_ppm,
+  m.presencia_pir,
+  m.intervalo_envio_ms,
+  m.limpio,
   e.estado_riesgo,
   e.razon_riesgo,
-  e.nivel_alerta,
   e.color_alerta,
   m.timestamp_origen,
   m.created_at
 FROM mediciones_brutas m
-INNER JOIN estados_medicion e ON e.medicion_id = m.id;
+LEFT JOIN estados_medicion e ON e.medicion_id = m.id;
 
-DROP PROCEDURE IF EXISTS sp_limpiar_datos_iot;
+CREATE VIEW vw_incidencias_medicion AS
+SELECT
+  i.id,
+  i.medicion_id,
+  i.id_habitacion,
+  i.tipo_incidencia,
+  i.detalle_incidencia,
+  i.valor_detectado,
+  i.created_at AS incidencia_created_at,
+  m.timestamp_origen,
+  m.created_at AS medicion_created_at
+FROM incidencias i
+INNER JOIN mediciones_brutas m ON m.id = i.medicion_id;
+
+CREATE TABLE IF NOT EXISTS analisis_mediciones (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  id_habitacion VARCHAR(50),
+  periodo_dias INT,
+  total_registros INT,
+  fecha_inicio_analisis DATETIME,
+  fecha_fin_analisis DATETIME,
+  fecha_generacion DATETIME,
+  temp_promedio FLOAT,
+  temp_mediana FLOAT,
+  temp_moda FLOAT,
+  temp_minima FLOAT,
+  temp_maxima FLOAT,
+  temp_rango FLOAT,
+  temp_stddev FLOAT,
+  temp_varianza FLOAT,
+  temp_fuera_rango INT,
+  temp_anomalias INT,
+  hum_promedio FLOAT,
+  hum_mediana FLOAT,
+  hum_moda FLOAT,
+  hum_minima FLOAT,
+  hum_maxima FLOAT,
+  hum_rango FLOAT,
+  hum_stddev FLOAT,
+  hum_varianza FLOAT,
+  hum_fuera_rango INT,
+  hum_anomalias INT,
+  fosfina_promedio FLOAT,
+  fosfina_mediana FLOAT,
+  fosfina_moda FLOAT,
+  fosfina_minima FLOAT,
+  fosfina_maxima FLOAT,
+  fosfina_rango FLOAT,
+  fosfina_stddev FLOAT,
+  fosfina_varianza FLOAT,
+  fosfina_fuera_rango INT,
+  fosfina_anomalias INT,
+  co_promedio FLOAT,
+  co_mediana FLOAT,
+  co_moda FLOAT,
+  co_minima FLOAT,
+  co_maxima FLOAT,
+  co_rango FLOAT,
+  co_stddev FLOAT,
+  co_varianza FLOAT,
+  co_fuera_rango INT,
+  co_anomalias INT,
+  corr_temp_hum FLOAT,
+  corr_fosfina_co FLOAT,
+  distribucion_categorias JSON,
+  patrones_temporales JSON,
+  relaciones_variables JSON,
+  comparacion_periodos JSON,
+  justificacion_analisis JSON,
+  limitaciones JSON
+);
+
 DELIMITER $$
 CREATE PROCEDURE sp_limpiar_datos_iot()
 BEGIN
+  DELETE FROM analisis_mediciones;
   DELETE FROM eventos_actuadores;
   DELETE FROM estados_medicion;
+  DELETE FROM incidencias;
+  DELETE FROM mediciones_limpias;
   DELETE FROM mediciones_brutas;
 END$$
 DELIMITER ;
+
+DROP TRIGGER IF EXISTS trg_mediciones_brutas_bi_calidad;
+DROP TRIGGER IF EXISTS trg_mediciones_brutas_ai_incidencia;
 
 DROP USER IF EXISTS 'nodered_user'@'%';
 CREATE USER 'nodered_user'@'%' IDENTIFIED WITH caching_sha2_password BY 'nodered_password_change_me';

@@ -2,7 +2,6 @@
 
 Esta guia explica como controlar por broker MQTT:
 - contexto de habitacion (`LIBRE`, `RESERVADA`, `FUMIGACION`),
-- estado del ciclo (`INICIAR`, `PAUSA`),
 - frecuencia de envio (`sample_interval_ms`),
 - pruebas de PIR y validacion de que el cambio realmente se aplico.
 
@@ -26,21 +25,23 @@ Esta guia explica como controlar por broker MQTT:
 
 ## 3) Campos JSON que entiende el sistema
 
-Comando minimo:
+Comando minimo (ESP32):
 
 ```json
 {
-  "msg": "INICIAR",
   "estado": "LIBRE"
 }
 ```
 
 Campos disponibles:
-- `msg`: `INICIAR` o `PAUSA`
 - `estado`: `LIBRE`, `RESERVADA`, `FUMIGACION`
 - `sample_interval_ms`: frecuencia de envio en ms
 - `intervalo_ms`: alias compatible para frecuencia
-- `device_id`: obligatorio para identificar el nodo destino dentro del payload
+- `id_habitacion`: opcional (si viene y no coincide, el comando se ignora)
+
+Notas:
+- `estado` debe venir en mayusculas para ser aceptado.
+- Los comandos solo usan `estado` y `sample_interval_ms` (o `intervalo_ms`).
 
 Rangos:
 - intervalo minimo: `1000` ms
@@ -49,12 +50,12 @@ Rangos:
 ## 4) Preparacion antes de enviar comandos
 
 1. Verifica variables en `.env`:
-   - `MQTT_SERVER`, `MQTT_PORT`, `MQTT_USER`, `MQTT_PASS`
-   - `TOPICO_DATOS`, `TOPICO_COMANDOS`
-  - `DEVICE_ID` si vas a probar los ejemplos de shell con tu nodo local
-2. Levanta servicios:
+  - `MQTT_SERVER`, `MQTT_PORT`, `MQTT_USER`, `MQTT_PASS`
+  - `TOPICO_DATOS`, `TOPICO_COMANDOS`
+2. Si vas a probar con ESP32, ajusta `ID_HABITACION` en `include/config.h`.
+3. Levanta servicios:
    - `docker compose up --build -d`
-3. Verifica backend:
+4. Verifica backend:
    - `bash scripts/verify-mysql.sh`
 
 ## 5) Cambiar estados desde Node-RED (sin terminal)
@@ -65,7 +66,7 @@ Rangos:
    - `Contexto RESERVADA`
    - `Contexto FUMIGACION`
 3. Haz click en el boton del inject deseado.
-4. Node-RED publica en `TOPICO_COMANDOS` con `device_id` en el payload.
+4. Node-RED publica en `TOPICO_COMANDOS` con `id_habitacion` en el payload.
 5. El dispositivo aplica el contexto y lo reporta en la siguiente telemetria.
 
 ## 6) Cambiar estados por broker con comando (terminal)
@@ -73,35 +74,30 @@ Rangos:
 ### Opcion A: `mosquitto_pub` local
 
 ```bash
-mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"msg":"INICIAR","estado":"LIBRE","sample_interval_ms":15000,"device_id":"ESP32-HW-01"}' -q 1
+mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"estado":"LIBRE","sample_interval_ms":15000,"id_habitacion":"HTL-N-P1-103"}' -q 1
 ```
 
 ### Opcion B: sin instalar nada (usando Docker)
 
 ```bash
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"msg":"INICIAR","estado":"LIBRE","sample_interval_ms":15000,"device_id":"ESP32-HW-01"}' -q 1
+docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"estado":"LIBRE","sample_interval_ms":15000,"id_habitacion":"HTL-N-P1-103"}' -q 1
 ```
 
 Comandos tipicos:
 
 ```bash
 # Cambiar a RESERVADA
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"msg":"INICIAR","estado":"RESERVADA","sample_interval_ms":15000,"device_id":"ESP32-HW-01"}' -q 1
+docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"estado":"RESERVADA","sample_interval_ms":15000,"id_habitacion":"HTL-N-P1-103"}' -q 1
 
 # Cambiar a FUMIGACION
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"msg":"INICIAR","estado":"FUMIGACION","sample_interval_ms":7000,"device_id":"ESP32-HW-01"}' -q 1
+docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"estado":"FUMIGACION","sample_interval_ms":7000,"id_habitacion":"HTL-N-P1-103"}' -q 1
 
-# Pausar envio
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"msg":"PAUSA","device_id":"ESP32-HW-01"}' -q 1
-
-# Reanudar envio
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"msg":"INICIAR","device_id":"ESP32-HW-01"}' -q 1
 ```
 
 Comando dirigido a un simulador especifico:
 
 ```bash
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"msg":"INICIAR","estado":"LIBRE","device_id":"SIM-NODO-01"}' -q 1
+docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_COMANDOS" -m '{"estado":"LIBRE","id_habitacion":"HTL-N-P1-103"}' -q 1
 ```
 
 ## 7) PIR: que se puede comandar y que no
@@ -117,7 +113,7 @@ Simulador:
 Si quieres probar un caso puntual de intruso, puedes inyectar telemetria manual en `TOPICO_DATOS`:
 
 ```bash
-docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_DATOS" -m '{"device_id":"TEST-PIR-01","habitacion":"HTL-N-P1-103","timestamp":"2026-04-21T12:00:00Z","contexto_hotel":"FUMIGACION","intervalo_envio_ms":7000,"fosfina_mq135":1800,"co_mq7":300,"presencia_pir":true,"temperatura_C":28,"humedad_pct":60}' -q 1
+docker run --rm eclipse-mosquitto mosquitto_pub -h "$MQTT_SERVER" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$TOPICO_DATOS" -m '{"id_habitacion":"HTL-N-P1-103","timestamp":"2026-04-21T12:00:00Z","contexto_hotel":"FUMIGACION","intervalo_envio_ms":7000,"fosfina_mq135":1800,"co_mq7":300,"presencia_pir":true,"temperatura_C":28,"humedad_pct":60}' -q 1
 ```
 
 ## 8) Como validar que el cambio si aplico
@@ -138,16 +134,24 @@ Validacion 3: MySQL
 - Revisar en `mediciones_brutas`:
   - `contexto_hotel`, `intervalo_envio_ms`, `presencia_pir`
 
+### Trazabilidad de datos erroneos
+
+El sistema ya no descarta una medicion con problemas de calidad. La estrategia es:
+
+- `mediciones_brutas` conserva el registro original y el flag `limpio` (0/1).
+- `mediciones_limpias` guarda los registros corregidos o imputados.
+- `incidencias` guarda el detalle del problema detectado (duplicados, incompletos, temporales, formato, atipicos).
+- `vw_mediciones_estado` muestra mediciones con su estado de riesgo.
+- Los injects de Node-RED para `RESUMEN_CALIDAD` e `INCIDENCIAS_RECIENTES` sirven para demostrar el analisis en clase.
+
 ## 9) Errores comunes
 
 - Estado no cambia:
   - `estado` debe ser exactamente `LIBRE`, `RESERVADA` o `FUMIGACION`.
-- Se pausa y no vuelve a enviar:
-  - enviar `{ "msg": "INICIAR" }`.
 - Comando parece correcto y no surte efecto:
   - revisar `TOPICO_COMANDOS` y credenciales del broker.
 - Simulador no toma comando dirigido:
-  - confirmar `device_id` exacto del simulador (`SIM_DEVICE_ID`).
+  - confirmar `id_habitacion` exacto del simulador (`SIM_ID_HABITACION`).
 
 ## 10) Flujo operativo recomendado
 

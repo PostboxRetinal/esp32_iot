@@ -1,0 +1,1202 @@
+[
+  {
+    "id": "b7d6c0b9c8cf00d5",
+    "type": "tab",
+    "label": "HTL-IOT-PROCESAMIENTO",
+    "disabled": false,
+    "info": "",
+    "env": []
+  },
+  {
+    "id": "f9b8f9ba238c2d7e",
+    "type": "mqtt in",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "mqtt in datos",
+    "topic": "${TOPICO_DATOS}",
+    "qos": "1",
+    "datatype": "utf8",
+    "broker": "a1b2c3d4e5f60111",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 140,
+    "y": 120,
+    "wires": [["c662ce57ec9b1ac2"]]
+  },
+  {
+    "id": "c662ce57ec9b1ac2",
+    "type": "json",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "parse json datos",
+    "property": "payload",
+    "action": "obj",
+    "pretty": false,
+    "x": 320,
+    "y": 120,
+    "wires": [["168c88cfda65fff7"]]
+  },
+  {
+    "id": "168c88cfda65fff7",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "validar + normalizar payload",
+    "func": "const p = msg.payload || {};\n\nif (typeof p !== 'object' || p === null || Array.isArray(p)) {\n    msg.error = 'payload no es un objeto JSON valido';\n    return [null, msg];\n}\n\nfunction toNumberOrNull(v) {\n    if (v === null || v === undefined || v === '') return null;\n    const n = Number(v);\n    return Number.isFinite(n) ? n : null;\n}\n\nfunction toBoolean(v, fallback = false) {\n    if (typeof v === 'boolean') return v;\n    if (typeof v === 'number') return v > 0;\n    if (typeof v === 'string') {\n        const x = v.trim().toLowerCase();\n        return x === '1' || x === 'true' || x === 'on' || x === 'si' || x === 'yes';\n    }\n    return fallback;\n}\n\nfunction normalizeTimestamp(raw) {\n    if (raw === null || raw === undefined || raw === '') return null;\n\n    if (typeof raw === 'number' && Number.isFinite(raw)) {\n        const epoch = raw < 1e12 ? raw * 1000 : raw;\n        const dt = new Date(epoch);\n        return Number.isFinite(dt.getTime()) ? dt.toISOString() : null;\n    }\n\n    if (typeof raw === 'string') {\n        const value = raw.trim();\n        if (!value) return null;\n\n        if (/^\\d+$/.test(value)) {\n            const epoch = Number(value);\n            if (Number.isFinite(epoch)) {\n                const ms = epoch < 1e12 ? epoch * 1000 : epoch;\n                const dtEpoch = new Date(ms);\n                return Number.isFinite(dtEpoch.getTime()) ? dtEpoch.toISOString() : null;\n            }\n        }\n\n        const parsed = Date.parse(value);\n        if (Number.isFinite(parsed)) {\n            return new Date(parsed).toISOString();\n        }\n    }\n\n    return null;\n}\n\nlet idHabitacion = String(p.id_habitacion ?? p.habitacion ?? p.room ?? '').trim();\nconst contextoRaw = String(p.contexto_hotel ?? p.room_context ?? 'LIBRE').trim().toUpperCase();\nconst contextoHotel = ['LIBRE', 'RESERVADA', 'FUMIGACION'].includes(contextoRaw) ? contextoRaw : 'LIBRE';\nconst rawTimestamp = p.timestamp ?? p.timestamp_ms ?? Date.now();\nlet timestamp = normalizeTimestamp(rawTimestamp);\nconst temperaturaC = toNumberOrNull(p.temperatura_C ?? p.temperature_C);\nconst humedadPct = toNumberOrNull(p.humedad_pct ?? p.humidity_pct);\nconst fosfinaMq135 = toNumberOrNull(p.fosfina_mq135 ?? p.mq135);\nconst coMq7 = toNumberOrNull(p.co_mq7 ?? p.mq7);\nconst ph3Ppm = toNumberOrNull(p.ph3_ppm);\nconst coPpm = toNumberOrNull(p.co_ppm);\nconst intervaloEnvioMs = toNumberOrNull(p.intervalo_envio_ms);\nconst presenciaPir = toBoolean(p.presencia_pir ?? p.motion, false);\nconst dhtOk = typeof p.dht_ok === 'boolean' ? p.dht_ok : null;\n\nconst out = {\n    id_habitacion: idHabitacion || 'DESCONOCIDO',\n    contexto_hotel: contextoHotel,\n    timestamp: timestamp || new Date().toISOString(),\n    sistema_activo: typeof p.sistema_activo === 'boolean' ? p.sistema_activo : null,\n    intervalo_envio_ms: intervaloEnvioMs,\n    fosfina_mq135: fosfinaMq135,\n    co_mq7: coMq7,\n    presencia_pir: presenciaPir,\n    evento_pir: p.evento_pir ? String(p.evento_pir) : null,\n    temperatura_C: temperaturaC,\n    humedad_pct: humedadPct,\n    ph3_ppm: ph3Ppm,\n    co_ppm: coPpm,\n    dht_ok: dhtOk,\n    error: p.error ? String(p.error) : null\n};\n\nconst issues = [];\nconst markIssue = (issue) => {\n    if (issue && !issues.includes(issue)) {\n        issues.push(issue);\n    }\n};\n\nif (!idHabitacion) markIssue('id_habitacion_faltante');\nif (!timestamp) markIssue('timestamp_invalido');\nif (contextoRaw && contextoRaw !== contextoHotel) markIssue('contexto_normalizado');\nif (!Number.isFinite(fosfinaMq135)) markIssue('fosfina_mq135_invalido');\nif (!Number.isFinite(coMq7)) markIssue('co_mq7_invalido');\nif (!Number.isFinite(temperaturaC) && dhtOk !== false) markIssue('temperatura_faltante');\nif (!Number.isFinite(humedadPct) && dhtOk !== false) markIssue('humedad_faltante');\nif (Number.isFinite(temperaturaC) && (temperaturaC < -20 || temperaturaC > 80)) markIssue('temperatura_fuera_rango');\nif (Number.isFinite(humedadPct) && (humedadPct < 0 || humedadPct > 100)) markIssue('humedad_fuera_rango');\nif (Number.isFinite(intervaloEnvioMs) && (intervaloEnvioMs < 1000 || intervaloEnvioMs > 60000)) markIssue('intervalo_fuera_rango');\nif (dhtOk === false) markIssue('dht_fallo');\nif (out.error) markIssue('error_sensor');\n\nconst parsedTimestamp = Date.parse(timestamp);\nif (Number.isFinite(parsedTimestamp)) {\n    const lastTsKey = 'last_timestamp_' + (idHabitacion || 'desconocido');\n    const lastTs = Number(flow.get(lastTsKey) || 0);\n    const gapLimit = Number.isFinite(intervaloEnvioMs) && intervaloEnvioMs > 0\n        ? Math.max(intervaloEnvioMs * 3, 30000)\n        : Number(env.get('TEMPORAL_GAP_MAX_MS') || 120000);\n    if (lastTs > 0) {\n        const gap = parsedTimestamp - lastTs;\n        if (gap > gapLimit) {\n            markIssue('hueco_temporal_' + gap + 'ms');\n        }\n    }\n    flow.set(lastTsKey, parsedTimestamp);\n}\n\nconst issueCount = issues.length;\nconst estadoCalidad = issueCount === 0 ? 'OK' : (issueCount === 1 ? 'OBSERVADO' : 'MULTIPLE');\nconst motivoCalidad = issueCount > 0 ? issues.join('; ') : null;\nconst firmaMedicion = [\n    out.id_habitacion,\n    out.timestamp,\n    out.contexto_hotel,\n    Number.isFinite(out.temperatura_C) ? out.temperatura_C.toFixed(2) : 'NULL',\n    Number.isFinite(out.humedad_pct) ? out.humedad_pct.toFixed(2) : 'NULL',\n    Number.isFinite(out.fosfina_mq135) ? out.fosfina_mq135.toFixed(2) : 'NULL',\n    Number.isFinite(out.co_mq7) ? out.co_mq7.toFixed(2) : 'NULL',\n    Number.isFinite(out.ph3_ppm) ? out.ph3_ppm.toFixed(2) : 'NULL',\n    Number.isFinite(out.co_ppm) ? out.co_ppm.toFixed(2) : 'NULL',\n    out.presencia_pir ? 1 : 0,\n    Number.isFinite(out.intervalo_envio_ms) ? out.intervalo_envio_ms : 'NULL'\n].join('|');\n\nmsg.rawPayload = p;\nmsg.validation_issues = issues;\nmsg.payload = {\n    ...out,\n    tiene_problema: issueCount > 0 ? 1 : 0,\n    estado_calidad: estadoCalidad,\n    motivo_calidad: motivoCalidad,\n    firma_medicion: firmaMedicion\n};\n\nreturn [msg, null];",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 570,
+    "y": 120,
+    "wires": [["0d9627be4652cda1"], ["0b9326811c83e391"]]
+  },
+  {
+    "id": "0b9326811c83e391",
+    "type": "debug",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "debug payload invalido",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "error",
+    "targetType": "msg",
+    "statusVal": "error",
+    "statusType": "msg",
+    "x": 840,
+    "y": 180,
+    "wires": []
+  },
+  {
+    "id": "0d9627be4652cda1",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "procesar estados (backend)",
+    "func": "const p = msg.payload || {};\n\nconst contextFromPayload = String(p.contexto_hotel || '').toUpperCase();\nconst validContexts = ['LIBRE', 'RESERVADA', 'FUMIGACION'];\nlet contexto = flow.get('estado_habitacion') || 'LIBRE';\nif (validContexts.includes(contextFromPayload) && contextFromPayload !== contexto) {\n    contexto = contextFromPayload;\n    flow.set('estado_habitacion', contexto);\n}\n\nconst PH3_PEL = Number(env.get('PH3_PEL_PPM') || 0.3);\nconst PH3_STEL = Number(env.get('PH3_STEL_PPM') || 1.0);\nconst PH3_IRRIT_LOW = Number(env.get('PH3_IRRIT_LOW_PPM') || 5);\nconst PH3_IRRIT_HIGH = Number(env.get('PH3_IRRIT_HIGH_PPM') || 10);\nconst PH3_IDLH = Number(env.get('PH3_IDLH_PPM') || 50);\nconst PH3_LETHAL_LOW = Number(env.get('PH3_LETHAL_LOW_PPM') || 400);\n\nconst CO_PEL = Number(env.get('CO_PEL_PPM') || 50);\nconst CO_HEADACHE = Number(env.get('CO_HEADACHE_PPM') || 200);\nconst CO_STEL = Number(env.get('CO_STEL_PPM') || 400);\nconst CO_SEVERE = Number(env.get('CO_SEVERE_PPM') || 800);\nconst CO_IDLH = Number(env.get('CO_IDLH_PPM') || 1500);\n\nconst TEMP_ALERTA = Number(env.get('TEMP_ALERTA_C') || 35);\nconst TEMP_INCENDIO = Number(env.get('UMBRAL_TEMP_INCENDIO') || 45);\nconst HUM_RIESGO_MIN = Number(env.get('HUM_RIESGO_MIN_PCT') || 30);\nconst HUM_RIESGO_MAX = Number(env.get('HUM_RIESGO_MAX_PCT') || 60);\n\nconst MQ135_MIN = Number(env.get('MQ135_RAW_MIN') || 0);\nconst MQ135_MAX = Number(env.get('MQ135_RAW_MAX') || 4095);\nconst MQ7_MIN = Number(env.get('MQ7_RAW_MIN') || 0);\nconst MQ7_MAX = Number(env.get('MQ7_RAW_MAX') || 4095);\nconst MQ135_PPM_MAX = Number(env.get('PH3_PPM_MAX_EST') || 120);\nconst MQ7_PPM_MAX = Number(env.get('CO_PPM_MAX_EST') || 2000);\n\nfunction clamp(v, lo, hi) {\n    return Math.max(lo, Math.min(hi, v));\n}\n\nfunction mapRawToPpm(raw, inMin, inMax, outMax) {\n    const x = clamp(Number(raw), inMin, inMax);\n    const ratio = (x - inMin) / Math.max(1, (inMax - inMin));\n    return ratio * outMax;\n}\n\nfunction hasNum(v) {\n    return Number.isFinite(Number(v));\n}\n\nfunction fmt(v) {\n    return Number.isFinite(Number(v)) ? Number(Number(v).toFixed(2)) : null;\n}\n\nconst ph3Ppm = hasNum(p.ph3_ppm) ? Number(p.ph3_ppm) : mapRawToPpm(p.fosfina_mq135, MQ135_MIN, MQ135_MAX, MQ135_PPM_MAX);\nconst coPpm = hasNum(p.co_ppm) ? Number(p.co_ppm) : mapRawToPpm(p.co_mq7, MQ7_MIN, MQ7_MAX, MQ7_PPM_MAX);\nconst tempC = hasNum(p.temperatura_C) ? Number(p.temperatura_C) : null;\nconst humPct = hasNum(p.humedad_pct) ? Number(p.humedad_pct) : null;\n\nconst severity = { NORMAL: 0, ALERTA: 1, EMERGENCIA: 2 };\nlet estado = 'NORMAL';\nlet razon = 'sin_alertas';\nlet nivel_alerta = 'NORMAL';\nlet color_alerta = 'green';\nconst motivos = [];\n\nfunction addMotivo(category, code, detail) {\n    const base = `${category}:${code}`;\n    motivos.push(detail ? `${base}|${detail}` : base);\n    return base;\n}\n\nfunction setEstado(nuevoEstado, razonBase, nivel, color) {\n    if (severity[nuevoEstado] > severity[estado]) {\n        estado = nuevoEstado;\n        razon = razonBase;\n        nivel_alerta = nivel;\n        color_alerta = color;\n    }\n}\n\nif (contexto === 'FUMIGACION') {\n    if (p.presencia_pir) {\n        const reason = addMotivo('presencia', 'intruso_fumigacion', 'pir=1');\n        setEstado('EMERGENCIA', reason, 'CRITICO: INTRUSO EN FUMIGACION', 'red');\n    }\n    if (ph3Ppm >= PH3_IDLH) {\n        const reason = addMotivo('gas', 'ph3_idlh', `ph3_ppm=${fmt(ph3Ppm)}`);\n        setEstado('EMERGENCIA', reason, 'CRITICO: FOSFINA SOBRE IDLH', 'red');\n    }\n    if (coPpm >= CO_IDLH) {\n        const reason = addMotivo('gas', 'co_idlh', `co_ppm=${fmt(coPpm)}`);\n        setEstado('EMERGENCIA', reason, 'CRITICO: CO IDLH', 'red');\n    }\n    if (tempC !== null && tempC >= TEMP_INCENDIO) {\n        const reason = addMotivo('temperatura', 'incendio', `temp_C=${fmt(tempC)}`);\n        setEstado('EMERGENCIA', reason, 'CRITICO: CONATO DE INCENDIO', 'red');\n    }\n    if (ph3Ppm >= PH3_PEL) {\n        const reason = addMotivo('gas', 'ph3_pel', `ph3_ppm=${fmt(ph3Ppm)}`);\n        setEstado('ALERTA', reason, 'ALERTA: FOSFINA SOBRE PEL', 'yellow');\n    }\n    if (coPpm >= CO_PEL) {\n        const reason = addMotivo('gas', 'co_pel', `co_ppm=${fmt(coPpm)}`);\n        setEstado('ALERTA', reason, 'ALERTA: CO SOBRE PEL', 'yellow');\n    }\n    if (tempC !== null && tempC >= TEMP_ALERTA) {\n        const reason = addMotivo('temperatura', 'elevada', `temp_C=${fmt(tempC)}`);\n        setEstado('ALERTA', reason, 'ALERTA: TEMPERATURA ELEVADA', 'yellow');\n    }\n} else {\n    if (ph3Ppm >= PH3_LETHAL_LOW) {\n        const reason = addMotivo('gas', 'ph3_letal', `ph3_ppm=${fmt(ph3Ppm)}`);\n        setEstado('EMERGENCIA', reason, 'CRITICO: FOSFINA NIVEL LETAL', 'red');\n    }\n    if (coPpm >= CO_IDLH) {\n        const reason = addMotivo('gas', 'co_idlh', `co_ppm=${fmt(coPpm)}`);\n        setEstado('EMERGENCIA', reason, 'CRITICO: CO IDLH', 'red');\n    }\n    if (tempC !== null && tempC >= TEMP_INCENDIO) {\n        const reason = addMotivo('temperatura', 'incendio', `temp_C=${fmt(tempC)}`);\n        setEstado('EMERGENCIA', reason, 'CRITICO: CONATO DE INCENDIO', 'red');\n    }\n    if (ph3Ppm >= PH3_IDLH) {\n        const reason = addMotivo('gas', 'ph3_idlh', `ph3_ppm=${fmt(ph3Ppm)}`);\n        setEstado('ALERTA', reason, 'ALERTA: FOSFINA SOBRE IDLH', 'yellow');\n    }\n    if (coPpm >= CO_SEVERE) {\n        const reason = addMotivo('gas', 'co_severo', `co_ppm=${fmt(coPpm)}`);\n        setEstado('ALERTA', reason, 'ALERTA: CO NIVEL SEVERO', 'yellow');\n    }\n    if (tempC !== null && tempC >= TEMP_ALERTA) {\n        const reason = addMotivo('temperatura', 'elevada', `temp_C=${fmt(tempC)}`);\n        setEstado('ALERTA', reason, 'ALERTA: TEMPERATURA ELEVADA', 'yellow');\n    }\n    if (ph3Ppm >= PH3_IRRIT_LOW) {\n        const reason = addMotivo('gas', 'ph3_irritacion', `ph3_ppm=${fmt(ph3Ppm)}`);\n        setEstado('ALERTA', reason, 'ALERTA: IRRITACION POR FOSFINA', 'yellow');\n    }\n    if (coPpm >= CO_STEL) {\n        const reason = addMotivo('gas', 'co_stel', `co_ppm=${fmt(coPpm)}`);\n        setEstado('ALERTA', reason, 'ALERTA: CO SOBRE STEL', 'yellow');\n    }\n    if (ph3Ppm >= PH3_STEL) {\n        const reason = addMotivo('gas', 'ph3_stel', `ph3_ppm=${fmt(ph3Ppm)}`);\n        setEstado('ALERTA', reason, 'ALERTA: FOSFINA SOBRE STEL', 'yellow');\n    }\n    if (coPpm >= CO_HEADACHE) {\n        const reason = addMotivo('gas', 'co_cefalea', `co_ppm=${fmt(coPpm)}`);\n        setEstado('ALERTA', reason, 'ALERTA: CO POSIBLE CEFALEA', 'yellow');\n    }\n    if (ph3Ppm >= PH3_PEL) {\n        const reason = addMotivo('gas', 'ph3_pel', `ph3_ppm=${fmt(ph3Ppm)}`);\n        setEstado('ALERTA', reason, 'ALERTA: FOSFINA SOBRE PEL', 'yellow');\n    }\n    if (coPpm >= CO_PEL) {\n        const reason = addMotivo('gas', 'co_pel', `co_ppm=${fmt(coPpm)}`);\n        setEstado('ALERTA', reason, 'ALERTA: CO SOBRE PEL', 'yellow');\n    }\n}\n\nif (Number.isFinite(humPct) && (humPct < HUM_RIESGO_MIN || humPct > HUM_RIESGO_MAX)) {\n    const reason = addMotivo('humedad', 'fuera_rango', `hum_pct=${fmt(humPct)}`);\n    setEstado('ALERTA', reason, 'ALERTA: HUMEDAD FUERA DE RANGO', 'yellow');\n}\n\nconst statusText = String(p.id_habitacion || '') + ' | ' + estado;\nif (estado === 'EMERGENCIA') {\n    node.status({ fill: 'red', shape: 'dot', text: statusText.slice(0, 64) });\n} else if (estado === 'ALERTA') {\n    node.status({ fill: 'yellow', shape: 'dot', text: statusText.slice(0, 64) });\n} else {\n    node.status({ fill: 'green', shape: 'dot', text: statusText.slice(0, 64) });\n}\n\nconst motivoActivacion = motivos.length ? motivos.join('; ') : 'sin_alertas';\n\nmsg.payload = {\n    ...p,\n    id_habitacion: p.id_habitacion,\n    contexto_hotel: contexto,\n    estado_riesgo: estado,\n    razon_riesgo: razon,\n    motivo_activacion: motivoActivacion,\n    nivel_alerta,\n    color_alerta,\n    ph3_ppm: Number.isFinite(ph3Ppm) ? Number(ph3Ppm.toFixed(2)) : null,\n    co_ppm: Number.isFinite(coPpm) ? Number(coPpm.toFixed(2)) : null,\n    timestamp: p.timestamp,\n    timestamp_servidor: new Date().toISOString()\n};\n\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 860,
+    "y": 120,
+    "wires": [["2288e4f69a485380", "f763f562a6d47815"]]
+  },
+  {
+    "id": "f763f562a6d47815",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "build SQL insert bruta",
+    "func": "const p = msg.payload || {};\n\nfunction toNumberOrNull(v, digits = null) {\n    const n = Number(v);\n    if (!Number.isFinite(n)) return null;\n    return digits === null ? n : Number(n.toFixed(digits));\n}\n\nfunction toMysqlDateTime(isoLike) {\n    const dt = new Date(isoLike);\n    if (!Number.isFinite(dt.getTime())) {\n        const now = new Date();\n        return now.toISOString().slice(0, 19).replace('T', ' ');\n    }\n    return dt.toISOString().slice(0, 19).replace('T', ' ');\n}\n\nmsg.idHabitacion = String(p.id_habitacion || 'N/A');\nmsg.contextoHotel = String(p.contexto_hotel || 'LIBRE');\nmsg.estadoRiesgo = String(p.estado_riesgo || 'INVALIDO').toUpperCase();\nmsg.razonRiesgo = String(p.razon_riesgo || 'sin_razon');\nmsg.nivelAlerta = String(p.nivel_alerta || 'N/A');\nmsg.colorAlerta = String(p.color_alerta || 'grey');\n\nmsg.topic = 'INSERT INTO mediciones_brutas (id_habitacion, contexto_hotel, temperatura_c, humedad_pct, fosfina_mq135, co_mq7, presencia_pir, intervalo_envio_ms, timestamp_origen) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';\nmsg.payload = [\n    msg.idHabitacion,\n    msg.contextoHotel,\n    toNumberOrNull(p.temperatura_C, 2),\n    toNumberOrNull(p.humedad_pct, 2),\n    toNumberOrNull(p.fosfina_mq135, 2),\n    toNumberOrNull(p.co_mq7, 2),\n    p.presencia_pir ? 1 : 0,\n    toNumberOrNull(p.intervalo_envio_ms),\n    toMysqlDateTime(p.timestamp)\n];\nmsg.queryType = 'insert_bruta';\n\nreturn msg;",
+    "outputs": 1,
+    "timeout": "",
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1140,
+    "y": 80,
+    "wires": [["dca3b24a91085534"]]
+  },
+  {
+    "id": "f8ea723cc2bc635b",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "build SQL insert estado",
+    "func": "const medicionId = Number(msg.payload && msg.payload.insertId);\nif (!Number.isFinite(medicionId) || medicionId <= 0) {\n    return null;\n}\n\nmsg.medicionId = medicionId;\nif (msg.idHabitacion) {\n    flow.set(`last_medicion_${msg.idHabitacion}`, medicionId);\n}\n\nmsg.topic = 'INSERT INTO estados_medicion (medicion_id, estado_riesgo, razon_riesgo, color_alerta) VALUES (?, ?, ?, ?)';\nmsg.payload = [\n    medicionId,\n    String(msg.estadoRiesgo || 'INVALIDO').toUpperCase(),\n    String(msg.razonRiesgo || ''),\n    String(msg.colorAlerta || 'grey')\n];\nmsg.queryType = 'insert_estado';\nreturn msg;",
+    "outputs": 1,
+    "timeout": "",
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1160,
+    "y": 120,
+    "wires": [["dca3b24a91085534"]]
+  },
+  {
+    "id": "2288e4f69a485380",
+    "type": "switch",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "ESTADOS",
+    "property": "payload.estado_riesgo",
+    "propertyType": "msg",
+    "rules": [
+      {
+        "t": "eq",
+        "v": "NORMAL",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "ALERTA",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "EMERGENCIA",
+        "vt": "str"
+      },
+      {
+        "t": "else"
+      }
+    ],
+    "checkall": "true",
+    "repair": false,
+    "outputs": 4,
+    "x": 1080,
+    "y": 240,
+    "wires": [
+      ["f3051d0a930d0937", "2e03c35144a59e1e"],
+      ["0f1953d279663222", "2e03c35144a59e1e"],
+      ["d1a88de4b3256373", "2e03c35144a59e1e"],
+      ["4aebca3950c2d155"]
+    ]
+  },
+  {
+    "id": "2e03c35144a59e1e",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "politica comandos",
+    "func": "const src = msg.payload || {};\nconst risk = String(src.estado_riesgo || '').toUpperCase();\nif (!['NORMAL', 'ALERTA', 'EMERGENCIA'].includes(risk)) return null;\n\nconst intervalByRisk = {\n    NORMAL: Number(env.get('SAMPLE_MS_NORMAL') || 15000),\n    ALERTA: Number(env.get('SAMPLE_MS_ALERTA') || 7000),\n    EMERGENCIA: Number(env.get('SAMPLE_MS_EMERGENCIA') || 3000)\n};\n\nconst intervalMs = Number(intervalByRisk[risk]);\nif (!Number.isFinite(intervalMs) || intervalMs <= 0) return null;\n\nconst contexto = flow.get('estado_habitacion') || String(src.contexto_hotel || 'LIBRE').toUpperCase();\nconst idHabitacion = String(src.id_habitacion || '').trim();\nif (!idHabitacion) return null;\n\nconst cooldownMs = Number(env.get('CMD_COOLDOWN_MS') || 15000);\nconst now = Date.now();\nconst lastAt = Number(flow.get('last_cmd_at') || 0);\nconst lastSig = flow.get('last_cmd_sig') || '';\nconst sig = `${idHabitacion}|${risk}|${contexto}|${intervalMs}`;\n\nif ((now - lastAt) < cooldownMs && lastSig === sig) {\n    return null;\n}\n\nflow.set('last_cmd_at', now);\nflow.set('last_cmd_sig', sig);\n\nmsg.commandMeta = {\n    id_habitacion: idHabitacion,\n    estado_riesgo: risk,\n    contexto_hotel: contexto,\n    motivo_activacion: String(src.motivo_activacion || src.razon_riesgo || src.nivel_alerta || 'ajuste_automatico'),\n    intervalo_objetivo_ms: intervalMs,\n    timestamp_origen: src.timestamp || null\n};\n\nconst baseTopic = env.get('TOPICO_COMANDOS') || 'alejandro.bravo_isa@uao.edu.co/comandos';\nmsg.topic = baseTopic;\nmsg.payload = {\n    estado: contexto,\n    sample_interval_ms: intervalMs,\n    id_habitacion: idHabitacion\n};\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1310,
+    "y": 280,
+    "wires": [["80fc9f72dc148d75", "5b960acf29f7316e", "240b2d8068f981ea"]]
+  },
+  {
+    "id": "240b2d8068f981ea",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "build SQL insert evento",
+    "func": "const meta = msg.commandMeta || {};\nif (!meta.id_habitacion) {\n    return null;\n}\n\nfunction toMysqlDateTime(isoLike) {\n    const dt = new Date(isoLike);\n    if (!Number.isFinite(dt.getTime())) {\n        return null;\n    }\n    return dt.toISOString().slice(0, 19).replace('T', ' ');\n}\n\nconst lastId = flow.get(`last_medicion_${meta.id_habitacion}`);\nconst medicionId = Number.isFinite(Number(lastId)) ? Number(lastId) : null;\n\nmsg.topic = 'INSERT INTO eventos_actuadores (medicion_id, id_habitacion, estado_riesgo, contexto_hotel, motivo_activacion, intervalo_objetivo_ms, timestamp_origen) VALUES (?, ?, ?, ?, ?, ?, ?)';\nmsg.payload = [\n    medicionId,\n    String(meta.id_habitacion),\n    String(meta.estado_riesgo || 'INVALIDO').toUpperCase(),\n    String(meta.contexto_hotel || 'LIBRE').toUpperCase(),\n    String(meta.motivo_activacion || 'sin_motivo'),\n    Number.isFinite(Number(meta.intervalo_objetivo_ms)) ? Number(meta.intervalo_objetivo_ms) : null,\n    toMysqlDateTime(meta.timestamp_origen)\n];\nmsg.queryType = 'insert_evento';\nreturn msg;",
+    "outputs": 1,
+    "timeout": "",
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1570,
+    "y": 280,
+    "wires": [["dca3b24a91085534"]]
+  },
+  {
+    "id": "80fc9f72dc148d75",
+    "type": "mqtt out",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "mqtt out comandos",
+    "topic": "${TOPICO_COMANDOS}",
+    "qos": "1",
+    "retain": "false",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "a1b2c3d4e5f60111",
+    "x": 1560,
+    "y": 220,
+    "wires": []
+  },
+  {
+    "id": "5b960acf29f7316e",
+    "type": "debug",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "debug comando emitido",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1580,
+    "y": 320,
+    "wires": []
+  },
+  {
+    "id": "f3051d0a930d0937",
+    "type": "debug",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "debug NORMAL",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "payload.nivel_alerta",
+    "statusType": "msg",
+    "x": 1320,
+    "y": 380,
+    "wires": []
+  },
+  {
+    "id": "0f1953d279663222",
+    "type": "debug",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "debug ALERTA",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "payload.nivel_alerta",
+    "statusType": "msg",
+    "x": 1320,
+    "y": 420,
+    "wires": []
+  },
+  {
+    "id": "d1a88de4b3256373",
+    "type": "debug",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "debug EMERGENCIA",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "payload.nivel_alerta",
+    "statusType": "msg",
+    "x": 1340,
+    "y": 460,
+    "wires": []
+  },
+  {
+    "id": "4aebca3950c2d155",
+    "type": "debug",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "debug OTROS/INVALIDO",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "true",
+    "targetType": "full",
+    "statusVal": "error",
+    "statusType": "msg",
+    "x": 1350,
+    "y": 500,
+    "wires": []
+  },
+  {
+    "id": "dca3b24a91085534",
+    "type": "mysql",
+    "z": "b7d6c0b9c8cf00d5",
+    "mydb": "d9f3d61e3a4c0aaa",
+    "name": "mysql query",
+    "x": 910,
+    "y": 700,
+    "wires": [["fc80bb460f478219"]]
+  },
+  {
+    "id": "fc80bb460f478219",
+    "type": "switch",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "tipo consulta",
+    "property": "queryType",
+    "propertyType": "msg",
+    "rules": [
+      {
+        "t": "eq",
+        "v": "insert_bruta",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "insert_estado",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "insert_evento",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "insert_analisis",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "select",
+        "vt": "str"
+      }
+    ],
+    "checkall": "true",
+    "repair": false,
+    "outputs": 5,
+    "x": 1090,
+    "y": 700,
+    "wires": [
+      ["f8ea723cc2bc635b"],
+      ["f21fe10c8747b920"],
+      ["a4fd53edb295f7f8"],
+      ["c2d9e3f7d0a61110"],
+      ["a358d6afacf0c7a4"]
+    ]
+  },
+  {
+    "id": "f21fe10c8747b920",
+    "type": "debug",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "debug mysql insert estado",
+    "active": true,
+    "tosidebar": false,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload.affectedRows",
+    "targetType": "msg",
+    "statusVal": "payload.affectedRows",
+    "statusType": "msg",
+    "x": 1320,
+    "y": 660,
+    "wires": []
+  },
+  {
+    "id": "a4fd53edb295f7f8",
+    "type": "debug",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "debug mysql insert evento",
+    "active": true,
+    "tosidebar": false,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload.affectedRows",
+    "targetType": "msg",
+    "statusVal": "payload.affectedRows",
+    "statusType": "msg",
+    "x": 1320,
+    "y": 700,
+    "wires": []
+  },
+  {
+    "id": "a358d6afacf0c7a4",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "formato select tabla",
+    "func": "const rows = Array.isArray(msg.payload) ? msg.payload : [];\n\nif (rows.length === 0) {\n    msg.payload = 'Sin resultados';\n    return msg;\n}\n\nconst safe = (v) => String(v ?? '');\nconst maxRows = 20;\nconst data = rows.slice(0, maxRows);\n\nconst cols = Object.keys(data[0] || {}).sort((a, b) => a.localeCompare(b));\nif (cols.length === 0) {\n    msg.payload = 'Sin columnas para mostrar';\n    return msg;\n}\n\nconst widths = cols.map((c) => c.length);\nfor (const r of data) {\n    cols.forEach((c, i) => {\n        const l = safe(r[c]).length;\n        if (l > widths[i]) widths[i] = Math.min(l, 40);\n    });\n}\n\nconst trunc = (s, w) => (s.length > w ? s.slice(0, w - 1) + '...' : s);\nconst pad = (s, w) => trunc(s, w).padEnd(w, ' ');\n\nconst header = cols.map((c, i) => pad(c, widths[i])).join(' | ');\nconst sep = widths.map((w) => '-'.repeat(w)).join('-+-');\nconst body = data.map((r) => cols.map((c, i) => pad(safe(r[c]), widths[i])).join(' | ')).join('\\n');\n\nmsg.payload = `Filas devueltas: ${rows.length}\\n\\n${header}\\n${sep}\\n${body}`;\nreturn msg;",
+    "outputs": 1,
+    "timeout": "",
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1280,
+    "y": 760,
+    "wires": [["b8115394c5d54f94"]]
+  },
+  {
+    "id": "b8115394c5d54f94",
+    "type": "debug",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "debug select tabla",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1460,
+    "y": 760,
+    "wires": []
+  },
+  {
+    "id": "280c86b4c143abc4",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "SELECT ultimas 20",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "",
+    "payloadType": "date",
+    "x": 200,
+    "y": 640,
+    "wires": [["36d294dd3d7fc199"]]
+  },
+  {
+    "id": "0761efe88fe2a347",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "SELECT EMERGENCIA",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "EMERGENCIA",
+    "payloadType": "str",
+    "x": 220,
+    "y": 680,
+    "wires": [["36d294dd3d7fc199"]]
+  },
+  {
+    "id": "7f15449ad1f2682c",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "SELECT ALERTA",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "ALERTA",
+    "payloadType": "str",
+    "x": 210,
+    "y": 720,
+    "wires": [["36d294dd3d7fc199"]]
+  },
+  {
+    "id": "431bf11ecee0cbf4",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "SELECT NORMAL",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "NORMAL",
+    "payloadType": "str",
+    "x": 210,
+    "y": 760,
+    "wires": [["36d294dd3d7fc199"]]
+  },
+  {
+    "id": "bc7fb6bb733b6f28",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "RESUMEN ALERTAS",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "RESUMEN_ALERTAS",
+    "payloadType": "str",
+    "x": 220,
+    "y": 800,
+    "wires": [["36d294dd3d7fc199"]]
+  },
+  {
+    "id": "edecdad222f9e09d",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "SELECT BRUTAS (ULTIMAS 20)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "BRUTAS_RECIENTES",
+    "payloadType": "str",
+    "x": 250,
+    "y": 840,
+    "wires": [["36d294dd3d7fc199"]]
+  },
+  {
+    "id": "eb02b22c71c90b33",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "SELECT EVENTOS (ÚLTIMOS 20)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "EVENTOS_RECIENTES",
+    "payloadType": "str",
+    "x": 250,
+    "y": 880,
+    "wires": [["36d294dd3d7fc199"]]
+  },
+  {
+    "id": "9e7c0db4f16a1f10",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "SELECT ANALISIS (ÚLTIMOS 20)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "ANALISIS_RECIENTES",
+    "payloadType": "str",
+    "x": 260,
+    "y": 920,
+    "wires": [["36d294dd3d7fc199"]]
+  },
+  {
+    "id": "36d294dd3d7fc199",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "build SQL select",
+    "func": "const token = String(msg.payload || '').trim().toUpperCase();\nconst baseJoin = 'SELECT m.id, m.id_habitacion, m.contexto_hotel, m.temperatura_c, m.humedad_pct, m.fosfina_mq135, m.co_mq7, m.presencia_pir, m.intervalo_envio_ms, m.limpio, e.estado_riesgo, e.razon_riesgo, e.color_alerta, m.timestamp_origen, m.created_at FROM mediciones_brutas m LEFT JOIN estados_medicion e ON e.medicion_id = m.id';\n\nif (['NORMAL', 'ALERTA', 'EMERGENCIA'].includes(token)) {\n    msg.topic = baseJoin + \" WHERE e.estado_riesgo='\" + token + \"' ORDER BY m.id DESC LIMIT 20\";\n} else if (token === 'RESUMEN_ALERTAS') {\n    msg.topic = \"SELECT estado_riesgo, COUNT(*) AS total, MAX(created_at) AS ultima_medicion FROM estados_medicion WHERE estado_riesgo IN ('ALERTA','EMERGENCIA') GROUP BY estado_riesgo ORDER BY total DESC\";\n} else if (token === 'RESUMEN_CALIDAD') {\n    msg.topic = \"SELECT limpio, COUNT(*) AS total, MAX(created_at) AS ultima_medicion FROM mediciones_brutas GROUP BY limpio ORDER BY limpio ASC\";\n} else if (token === 'BRUTAS_RECIENTES') {\n    msg.topic = 'SELECT id, id_habitacion, contexto_hotel, temperatura_c, humedad_pct, fosfina_mq135, co_mq7, presencia_pir, intervalo_envio_ms, limpio, timestamp_origen, created_at FROM mediciones_brutas ORDER BY id DESC LIMIT 20';\n} else if (token === 'INCIDENCIAS_RECIENTES') {\n    msg.topic = 'SELECT id, medicion_id, id_habitacion, tipo_incidencia, detalle_incidencia, valor_detectado, created_at FROM incidencias ORDER BY id DESC LIMIT 20';\n} else if (token === 'EVENTOS_RECIENTES') {\n    msg.topic = 'SELECT id, medicion_id, id_habitacion, estado_riesgo, contexto_hotel, motivo_activacion, intervalo_objetivo_ms, timestamp_origen, created_at FROM eventos_actuadores ORDER BY id DESC LIMIT 20';\n} else if (token === 'ANALISIS_RECIENTES') {\n    msg.topic = 'SELECT id, id_habitacion, periodo_dias, total_registros, fecha_inicio_analisis, fecha_fin_analisis, temp_promedio, temp_mediana, temp_moda, temp_minima, temp_maxima, temp_rango, temp_stddev, temp_varianza, temp_fuera_rango, temp_anomalias, hum_promedio, hum_mediana, hum_moda, hum_minima, hum_maxima, hum_rango, hum_stddev, hum_varianza, hum_fuera_rango, hum_anomalias, fosfina_promedio, fosfina_mediana, fosfina_moda, fosfina_minima, fosfina_maxima, fosfina_rango, fosfina_stddev, fosfina_varianza, fosfina_fuera_rango, fosfina_anomalias, co_promedio, co_mediana, co_moda, co_minima, co_maxima, co_rango, co_stddev, co_varianza, co_fuera_rango, co_anomalias, corr_temp_hum, corr_fosfina_co, fecha_generacion FROM analisis_mediciones ORDER BY fecha_generacion DESC LIMIT 20';\n} else {\n    msg.topic = baseJoin + ' ORDER BY m.id DESC LIMIT 20';\n}\n\nmsg.queryType = 'select';\nmsg.payload = [];\nreturn msg;",
+    "outputs": 1,
+    "timeout": "",
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 510,
+    "y": 760,
+    "wires": [["dca3b24a91085534"]]
+  },
+  {
+    "id": "5f140744d347019a",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "Contexto LIBRE",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "${TOPICO_COMANDOS}",
+    "payload": "{\"estado\":\"LIBRE\",\"id_habitacion\":\"HTL-N-P1-103\"}",
+    "payloadType": "json",
+    "x": 180,
+    "y": 320,
+    "wires": [["5798f954f5e9c111"]]
+  },
+  {
+    "id": "06534d6bf41c8a53",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "Contexto RESERVADA",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "${TOPICO_COMANDOS}",
+    "payload": "{\"estado\":\"RESERVADA\",\"id_habitacion\":\"HTL-N-P1-103\"}",
+    "payloadType": "json",
+    "x": 200,
+    "y": 360,
+    "wires": [["5798f954f5e9c111"]]
+  },
+  {
+    "id": "0c6e95a9f1a5ef0e",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "Contexto FUMIGACION",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "${TOPICO_COMANDOS}",
+    "payload": "{\"estado\":\"FUMIGACION\",\"id_habitacion\":\"HTL-N-P1-103\"}",
+    "payloadType": "json",
+    "x": 210,
+    "y": 400,
+    "wires": [["5798f954f5e9c111"]]
+  },
+  {
+    "id": "5798f954f5e9c111",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "set contexto backend + forward",
+    "func": "const estado = String(msg?.payload?.estado || '').toUpperCase();\nconst idHabitacion = String(msg?.payload?.id_habitacion || '').trim();\nconst validos = ['LIBRE', 'RESERVADA', 'FUMIGACION'];\nif (!validos.includes(estado)) {\n    node.warn('estado invalido: ' + estado);\n    return null;\n}\nif (!idHabitacion) {\n    node.warn('id_habitacion requerido para comando dirigido');\n    return null;\n}\nflow.set('estado_habitacion', estado);\nconst baseTopic = env.get('TOPICO_COMANDOS') || 'alejandro.bravo_isa@uao.edu.co/comandos';\nmsg.topic = baseTopic;\nmsg.payload = { estado, id_habitacion: idHabitacion };\nreturn msg;",
+    "outputs": 1,
+    "timeout": "",
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 490,
+    "y": 360,
+    "wires": [["80fc9f72dc148d75", "5b960acf29f7316e"]]
+  },
+  {
+    "id": "a1b2c3d4e5f60111",
+    "type": "mqtt-broker",
+    "name": "Broker MQTT",
+    "broker": "${MQTT_SERVER}",
+    "port": "${MQTT_PORT}",
+    "clientid": "",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": true,
+    "autoUnsubscribe": true,
+    "birthTopic": "",
+    "birthQos": "0",
+    "birthRetain": "false",
+    "birthPayload": "",
+    "birthMsg": {},
+    "closeTopic": "",
+    "closeQos": "0",
+    "closeRetain": "false",
+    "closePayload": "",
+    "closeMsg": {},
+    "willTopic": "",
+    "willQos": "0",
+    "willRetain": "false",
+    "willPayload": "",
+    "willMsg": {},
+    "userProps": "",
+    "sessionExpiry": ""
+  },
+  {
+    "id": "d9f3d61e3a4c0aaa",
+    "type": "MySQLdatabase",
+    "name": "mysql-iot",
+    "host": "mysql",
+    "port": "3306",
+    "db": "ciudad_inteligente",
+    "tz": "",
+    "charset": "UTF8"
+  },
+  {
+    "id": "e2cdef387b652a1d",
+    "type": "global-config",
+    "env": [],
+    "modules": {
+      "node-red-node-mysql": "3.0.0"
+    }
+  },
+  {
+    "id": "3b9d3fae9a101111",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "SELECT CALIDAD (RESUMEN)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "RESUMEN_CALIDAD",
+    "payloadType": "str",
+    "x": 270,
+    "y": 920,
+    "wires": [["36d294dd3d7fc199"]]
+  },
+  {
+    "id": "3b9d3fae9a101112",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "SELECT INCIDENCIAS (ULTIMAS 20)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "INCIDENCIAS_RECIENTES",
+    "payloadType": "str",
+    "x": 280,
+    "y": 960,
+    "wires": [["36d294dd3d7fc199"]]
+  },
+  {
+    "id": "c1e5b49a2f3c1111",
+    "type": "tab",
+    "label": "HTL-IOT-LIMPIEZA",
+    "disabled": false,
+    "info": ""
+  },
+  {
+    "id": "c1e5b49a2f3c1112",
+    "type": "inject",
+    "z": "c1e5b49a2f3c1111",
+    "name": "LIMPIAR LOTE (100)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "LIMPIAR_100",
+    "payloadType": "str",
+    "x": 180,
+    "y": 120,
+    "wires": [["c1e5b49a2f3c1113"]]
+  },
+  {
+    "id": "c1e5b49a2f3c1130",
+    "type": "http in",
+    "z": "c1e5b49a2f3c1111",
+    "name": "POST limpiar lote API",
+    "url": "/api/limpieza/lote",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 180,
+    "y": 60,
+    "wires": [["c1e5b49a2f3c1131"]]
+  },
+  {
+    "id": "c1e5b49a2f3c1131",
+    "type": "function",
+    "z": "c1e5b49a2f3c1111",
+    "name": "ack limpieza API",
+    "func": "const requestedAt = new Date().toISOString();\n\nconst runMsg = {\n    payload: 'LIMPIAR_100',\n    source: 'api',\n    requested_at: requestedAt\n};\n\nconst responseMsg = {\n    ...msg,\n    statusCode: 202,\n    headers: {\n        'Content-Type': 'application/json'\n    },\n    payload: {\n        ok: true,\n        action: 'LIMPIAR_100',\n        message: 'Limpieza de lote iniciada',\n        requested_at: requestedAt\n    }\n};\n\nreturn [runMsg, responseMsg];",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 430,
+    "y": 60,
+    "wires": [["c1e5b49a2f3c1113"], ["c1e5b49a2f3c1132"]]
+  },
+  {
+    "id": "c1e5b49a2f3c1132",
+    "type": "http response",
+    "z": "c1e5b49a2f3c1111",
+    "name": "response limpieza API",
+    "statusCode": "",
+    "headers": {},
+    "x": 670,
+    "y": 60,
+    "wires": []
+  },
+  {
+    "id": "c1e5b49a2f3c1113",
+    "type": "function",
+    "z": "c1e5b49a2f3c1111",
+    "name": "build SQL select lote",
+    "func": "msg.topic = 'SELECT id, id_habitacion, contexto_hotel, temperatura_c, humedad_pct, fosfina_mq135, co_mq7, presencia_pir, intervalo_envio_ms, timestamp_origen FROM mediciones_brutas WHERE limpio = 0 ORDER BY id ASC LIMIT 100';\nmsg.queryType = 'select_lote';\nmsg.payload = [];\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 430,
+    "y": 120,
+    "wires": [["c1e5b49a2f3c1114"]]
+  },
+  {
+    "id": "c1e5b49a2f3c1114",
+    "type": "mysql",
+    "z": "c1e5b49a2f3c1111",
+    "mydb": "d9f3d61e3a4c0aaa",
+    "name": "mysql select lote",
+    "x": 650,
+    "y": 120,
+    "wires": [["c1e5b49a2f3c1115"]]
+  },
+  {
+    "id": "c1e5b49a2f3c1115",
+    "type": "function",
+    "z": "c1e5b49a2f3c1111",
+    "name": "prepare stats query",
+    "func": "const rows = Array.isArray(msg.payload) ? msg.payload : [];\nif (rows.length === 0) {\n    msg.payload = 'Sin registros pendientes';\n    return [null, msg];\n}\n\nconst habitacionIds = [...new Set(rows.map((r) => String(r.id_habitacion || '').trim()).filter(Boolean))];\nif (habitacionIds.length === 0) {\n    msg.payload = 'Sin id_habitacion en lote';\n    return [null, msg];\n}\n\nconst safeIds = habitacionIds.map((v) => v.replace(/'/g, \"''\"));\nmsg.batchId = Date.now();\nmsg.batchRows = rows;\nmsg.topic = `SELECT id_habitacion, temperatura_c, humedad_pct, fosfina_mq135, co_mq7 FROM mediciones_brutas WHERE id_habitacion IN ('${safeIds.join(\"','\")}') AND (temperatura_c IS NOT NULL OR humedad_pct IS NOT NULL OR fosfina_mq135 IS NOT NULL OR co_mq7 IS NOT NULL)`;\nmsg.queryType = 'select_stats';\nreturn [msg, null];",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 880,
+    "y": 120,
+    "wires": [["c1e5b49a2f3c1116"], ["c1e5b49a2f3c1122"]]
+  },
+  {
+    "id": "c1e5b49a2f3c1116",
+    "type": "mysql",
+    "z": "c1e5b49a2f3c1111",
+    "mydb": "d9f3d61e3a4c0aaa",
+    "name": "mysql select stats",
+    "x": 1090,
+    "y": 120,
+    "wires": [["c1e5b49a2f3c1117"]]
+  },
+  {
+    "id": "c1e5b49a2f3c1117",
+    "type": "function",
+    "z": "c1e5b49a2f3c1111",
+    "name": "build stats + split",
+    "func": "const statsRows = Array.isArray(msg.payload) ? msg.payload : [];\nconst batchRows = Array.isArray(msg.batchRows) ? msg.batchRows : [];\n\nif (batchRows.length === 0) {\n    msg.payload = 'Sin registros en lote';\n    return msg;\n}\n\nconst statsByHabitacion = {};\nconst intervalCounts = {};\n\nfunction ensureHabitacion(idHabitacion) {\n    if (!statsByHabitacion[idHabitacion]) {\n        statsByHabitacion[idHabitacion] = { values: {}, median: {}, intervalo_envio_ms: null };\n    }\n}\n\nfunction pushVal(idHabitacion, field, value) {\n    if (!Number.isFinite(value) || value === 0) return;\n    ensureHabitacion(idHabitacion);\n    if (!statsByHabitacion[idHabitacion].values[field]) {\n        statsByHabitacion[idHabitacion].values[field] = [];\n    }\n    statsByHabitacion[idHabitacion].values[field].push(value);\n}\n\nfor (const r of statsRows) {\n    const idHabitacion = String(r.id_habitacion || '').trim();\n    if (!idHabitacion) continue;\n    pushVal(idHabitacion, 'temperatura_c', Number(r.temperatura_c));\n    pushVal(idHabitacion, 'humedad_pct', Number(r.humedad_pct));\n    pushVal(idHabitacion, 'fosfina_mq135', Number(r.fosfina_mq135));\n    pushVal(idHabitacion, 'co_mq7', Number(r.co_mq7));\n}\n\nfor (const r of batchRows) {\n    const idHabitacion = String(r.id_habitacion || '').trim();\n    if (!idHabitacion) continue;\n    const interval = Number(r.intervalo_envio_ms);\n    if (!Number.isFinite(interval) || interval <= 0) continue;\n    if (!intervalCounts[idHabitacion]) intervalCounts[idHabitacion] = {};\n    const key = String(interval);\n    intervalCounts[idHabitacion][key] = (intervalCounts[idHabitacion][key] || 0) + 1;\n}\n\nfunction median(values) {\n    const arr = values.slice().sort((a, b) => a - b);\n    const mid = Math.floor(arr.length / 2);\n    if (arr.length === 0) return null;\n    return arr.length % 2 === 0 ? (arr[mid - 1] + arr[mid]) / 2 : arr[mid];\n}\n\nfunction modeFromCounts(counts) {\n    let best = null;\n    let bestCount = 0;\n    for (const [value, count] of Object.entries(counts || {})) {\n        if (count > bestCount) {\n            bestCount = count;\n            best = value;\n        }\n    }\n    return best !== null ? Number(best) : null;\n}\n\nfor (const [idHabitacion, data] of Object.entries(statsByHabitacion)) {\n    data.median.temperatura_c = median(data.values.temperatura_c || []);\n    data.median.humedad_pct = median(data.values.humedad_pct || []);\n    data.median.fosfina_mq135 = median(data.values.fosfina_mq135 || []);\n    data.median.co_mq7 = median(data.values.co_mq7 || []);\n    data.intervalo_envio_ms = modeFromCounts(intervalCounts[idHabitacion]);\n    delete data.values;\n}\n\nconst batchId = msg.batchId || Date.now();\nflow.set('current_batch_id', batchId);\nflow.set('batch_signatures', {});\nmsg.statsByHabitacion = statsByHabitacion;\nmsg.batchId = batchId;\nmsg.payload = batchRows;\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1310,
+    "y": 120,
+    "wires": [["c1e5b49a2f3c1118"]]
+  },
+  {
+    "id": "c1e5b49a2f3c1118",
+    "type": "split",
+    "z": "c1e5b49a2f3c1111",
+    "name": "split rows",
+    "splt": "\n",
+    "spltType": "str",
+    "arraySplt": 1,
+    "arraySpltType": "len",
+    "stream": false,
+    "addname": "",
+    "x": 1510,
+    "y": 120,
+    "wires": [["c1e5b49a2f3c1119"]]
+  },
+  {
+    "id": "c1e5b49a2f3c1119",
+    "type": "function",
+    "z": "c1e5b49a2f3c1111",
+    "name": "validar + imputar",
+    "func": "const row = msg.payload || {};\nconst statsByHabitacion = msg.statsByHabitacion || {};\nconst idHabitacion = String(row.id_habitacion || '').trim();\nconst contexto = String(row.contexto_hotel || '').trim().toUpperCase();\nconst rawTs = row.timestamp_origen;\nconst ts = new Date(rawTs);\nconst tsOk = Number.isFinite(ts.getTime());\n\nconst errors = [];\nconst errorCols = new Set();\nconst categories = new Set();\nlet fatal = false;\nconst measuredCols = new Set(['temperatura_c', 'humedad_pct', 'fosfina_mq135', 'co_mq7']);\n\nfunction addError(code, col, category) {\n    if (code && !errors.includes(code)) {\n        errors.push(code);\n    }\n    if (category) categories.add(category);\n    if (col && measuredCols.has(col)) errorCols.add(col);\n}\n\nif (!idHabitacion) {\n    addError('id_habitacion_faltante', 'id_habitacion', 'INCOMPLETO');\n    fatal = true;\n}\nif (!tsOk) {\n    addError('timestamp_invalido', 'timestamp_origen', 'FORMATO');\n    fatal = true;\n}\n\nconst tempMin = Number(env.get('TEMP_MIN_C') || -20);\nconst tempMax = Number(env.get('TEMP_MAX_C') || 80);\nconst humMin = Number(env.get('HUM_MIN_PCT') || 0);\nconst humMax = Number(env.get('HUM_MAX_PCT') || 100);\nconst mq135Min = Number(env.get('MQ135_RAW_MIN') || 0);\nconst mq135Max = Number(env.get('MQ135_RAW_MAX') || 4095);\nconst mq7Min = Number(env.get('MQ7_RAW_MIN') || 0);\nconst mq7Max = Number(env.get('MQ7_RAW_MAX') || 4095);\n\nfunction readNumeric(value, field, min, max, missingCode, formatCode, rangeCode) {\n    if (value === null || value === undefined || value === '') {\n        addError(missingCode, field, 'INCOMPLETO');\n        return null;\n    }\n    const n = Number(value);\n    if (!Number.isFinite(n)) {\n        addError(formatCode, field, 'FORMATO');\n        return null;\n    }\n    if (Number.isFinite(min) && n < min) {\n        addError(rangeCode, field, 'ATIPICO');\n        return null;\n    }\n    if (Number.isFinite(max) && n > max) {\n        addError(rangeCode, field, 'ATIPICO');\n        return null;\n    }\n    if (n === 0) {\n        addError(field + '_cero_no_permitido', field, 'ATIPICO');\n        return null;\n    }\n    return n;\n}\n\nconst temperatura = readNumeric(row.temperatura_c, 'temperatura_c', tempMin, tempMax, 'temperatura_faltante', 'temperatura_formato', 'temperatura_fuera_rango');\nconst humedad = readNumeric(row.humedad_pct, 'humedad_pct', humMin, humMax, 'humedad_faltante', 'humedad_formato', 'humedad_fuera_rango');\nconst fosfina = readNumeric(row.fosfina_mq135, 'fosfina_mq135', mq135Min, mq135Max, 'fosfina_mq135_faltante', 'fosfina_mq135_formato', 'fosfina_mq135_fuera_rango');\nconst co = readNumeric(row.co_mq7, 'co_mq7', mq7Min, mq7Max, 'co_mq7_faltante', 'co_mq7_formato', 'co_mq7_fuera_rango');\n\nlet presenciaPir = 0;\nif (row.presencia_pir !== null && row.presencia_pir !== undefined && row.presencia_pir !== '') {\n    const pirNum = Number(row.presencia_pir);\n    if (Number.isFinite(pirNum)) {\n        presenciaPir = pirNum > 0 ? 1 : 0;\n    } else {\n        addError('presencia_pir_formato', 'presencia_pir', 'FORMATO');\n        presenciaPir = 0;\n    }\n}\n\nlet intervaloEnvio = null;\nif (row.intervalo_envio_ms !== null && row.intervalo_envio_ms !== undefined && row.intervalo_envio_ms !== '') {\n    const intervalNum = Number(row.intervalo_envio_ms);\n    if (Number.isFinite(intervalNum)) {\n        intervaloEnvio = intervalNum;\n    } else {\n        addError('intervalo_formato', 'intervalo_envio_ms', 'FORMATO');\n    }\n}\n\nconst habitacionStats = statsByHabitacion[idHabitacion] || {};\nconst expectedInterval = Number.isFinite(intervaloEnvio) && intervaloEnvio > 0\n    ? intervaloEnvio\n    : Number(habitacionStats.intervalo_envio_ms || env.get('TEMPORAL_INTERVALO_DEFAULT_MS') || 15000);\n\nif (tsOk) {\n    const lastKey = 'last_ts_limpieza_' + (idHabitacion || 'desconocido');\n    const lastTs = Number(flow.get(lastKey) || 0);\n    const gapMax = Number(env.get('TEMPORAL_GAP_MAX_MS') || 120000);\n    const lossMax = Number(env.get('TEMPORAL_LOSS_MAX_MS') || Math.max(gapMax * 3, expectedInterval * 10));\n    if (lastTs > 0) {\n        const gap = ts.getTime() - lastTs;\n        if (gap > lossMax) {\n            addError('perdida_comunicacion_' + gap + 'ms', 'timestamp_origen', 'TEMPORAL');\n        } else if (gap > gapMax) {\n            addError('hueco_temporal_' + gap + 'ms', 'timestamp_origen', 'TEMPORAL');\n        } else if (expectedInterval > 0 && Math.abs(gap - expectedInterval) > expectedInterval * 0.5) {\n            addError('intervalo_irregular_' + gap + 'ms', 'timestamp_origen', 'TEMPORAL');\n        }\n    }\n    flow.set(lastKey, ts.getTime());\n}\n\nconst batchId = msg.batchId || flow.get('current_batch_id');\nif (batchId && batchId !== flow.get('current_batch_id')) {\n    flow.set('current_batch_id', batchId);\n    flow.set('batch_signatures', {});\n}\nconst batchSigs = flow.get('batch_signatures') || {};\nconst signature = [\n    idHabitacion,\n    contexto,\n    tsOk ? ts.toISOString() : String(rawTs),\n    Number.isFinite(temperatura) ? temperatura.toFixed(2) : 'NULL',\n    Number.isFinite(humedad) ? humedad.toFixed(2) : 'NULL',\n    Number.isFinite(fosfina) ? fosfina.toFixed(2) : 'NULL',\n    Number.isFinite(co) ? co.toFixed(2) : 'NULL',\n    presenciaPir,\n    Number.isFinite(intervaloEnvio) ? intervaloEnvio : 'NULL'\n].join('|');\n\nif (batchSigs[signature]) {\n    addError('duplicado_batch', 'duplicado', 'DUPLICADO');\n} else {\n    batchSigs[signature] = Date.now();\n}\nflow.set('batch_signatures', batchSigs);\n\nconst ttlMs = Number(env.get('DUP_SIG_TTL_MS') || 86400000);\nconst recentSigs = flow.get('recent_signatures') || {};\nconst now = Date.now();\nfor (const [sig, seenAt] of Object.entries(recentSigs)) {\n    if ((now - seenAt) > ttlMs) {\n        delete recentSigs[sig];\n    }\n}\nif (recentSigs[signature]) {\n    addError('duplicado_historico', 'duplicado', 'DUPLICADO');\n}\nrecentSigs[signature] = now;\nflow.set('recent_signatures', recentSigs);\n\nconst errorColumnCount = errorCols.size;\nconst imputedColumns = [];\nconst medians = habitacionStats && habitacionStats.median ? habitacionStats.median : {};\n\nfunction impute(field, current) {\n    if (Number.isFinite(current)) return current;\n    const fallback = Number(medians[field]);\n    if (Number.isFinite(fallback) && fallback !== 0) {\n        imputedColumns.push(field);\n        return Number(fallback);\n    }\n    addError('imputacion_sin_datos', field, 'ERROR');\n    fatal = true;\n    return current;\n}\n\nlet cleanMsg = null;\nif (!fatal && errorColumnCount <= 2) {\n    const cleanData = {\n        temperatura_c: impute('temperatura_c', temperatura),\n        humedad_pct: impute('humedad_pct', humedad),\n        fosfina_mq135: impute('fosfina_mq135', fosfina),\n        co_mq7: impute('co_mq7', co),\n        presencia_pir: presenciaPir,\n        intervalo_envio_ms: intervaloEnvio,\n        timestamp_origen: tsOk ? ts.toISOString().slice(0, 19).replace('T', ' ') : null\n    };\n    if (!fatal) {\n        cleanMsg = {\n            ...msg,\n            cleanData,\n            medicionesBrutasId: Number(row.id),\n            idHabitacion,\n            errors,\n            errorColumns: Array.from(errorCols),\n            imputedColumns\n        };\n    }\n}\n\nlet incidenciaMsg = null;\nif (errors.length > 0 || fatal) {\n    let tipo = 'ERROR';\n    if (categories.size === 1) {\n        tipo = Array.from(categories)[0];\n    } else if (categories.size > 1) {\n        tipo = 'MULTIPLE';\n    }\n    const detalle = errors.join('; ').slice(0, 255);\n    const valor = {\n        errors,\n        error_columns: Array.from(errorCols),\n        imputed_columns: imputedColumns,\n        id_habitacion: idHabitacion,\n        timestamp_origen: rawTs,\n        raw: {\n            temperatura_c: row.temperatura_c,\n            humedad_pct: row.humedad_pct,\n            fosfina_mq135: row.fosfina_mq135,\n            co_mq7: row.co_mq7,\n            presencia_pir: row.presencia_pir,\n            intervalo_envio_ms: row.intervalo_envio_ms\n        }\n    };\n    incidenciaMsg = {\n        ...msg,\n        medicionesBrutasId: Number(row.id),\n        idHabitacion,\n        incidencia: {\n            tipo,\n            detalle,\n            valor\n        }\n    };\n}\n\nreturn [cleanMsg, incidenciaMsg];",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1730,
+    "y": 120,
+    "wires": [["c1e5b49a2f3c111b"], ["c1e5b49a2f3c111d"]]
+  },
+  {
+    "id": "c1e5b49a2f3c111b",
+    "type": "function",
+    "z": "c1e5b49a2f3c1111",
+    "name": "build insert limpia",
+    "func": "const data = msg.cleanData || {};\nconst medicionId = Number(msg.medicionesBrutasId);\nif (!Number.isFinite(medicionId) || medicionId <= 0) {\n    return null;\n}\n\nfunction cleanNumber(value) {\n    const n = Number(value);\n    return Number.isFinite(n) && n !== 0 ? n : null;\n}\n\nconst cleanValues = [\n    cleanNumber(data.temperatura_c),\n    cleanNumber(data.humedad_pct),\n    cleanNumber(data.fosfina_mq135),\n    cleanNumber(data.co_mq7)\n];\n\nif (cleanValues.some((value) => value === null)) {\n    node.warn('mediciones_limpias bloqueada: valor 0 o invalido');\n    return null;\n}\n\nmsg.topic = 'INSERT INTO mediciones_limpias (medicion_id, temperatura_c, humedad_pct, fosfina_mq135, co_mq7) VALUES (?, ?, ?, ?, ?)';\nmsg.payload = [medicionId, ...cleanValues];\nmsg.queryType = 'insert_limpia';\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1960,
+    "y": 80,
+    "wires": [["c1e5b49a2f3c111c"]]
+  },
+  {
+    "id": "c1e5b49a2f3c111c",
+    "type": "mysql",
+    "z": "c1e5b49a2f3c1111",
+    "mydb": "d9f3d61e3a4c0aaa",
+    "name": "mysql insert limpia",
+    "x": 2180,
+    "y": 80,
+    "wires": [["c1e5b49a2f3c111f"]]
+  },
+  {
+    "id": "c1e5b49a2f3c111d",
+    "type": "function",
+    "z": "c1e5b49a2f3c1111",
+    "name": "build insert incidencia",
+    "func": "const inc = msg.incidencia || {};\nconst medicionId = Number(msg.medicionesBrutasId);\nif (!Number.isFinite(medicionId) || medicionId <= 0) {\n    return null;\n}\nconst idHabitacion = String(msg.idHabitacion || 'DESCONOCIDO');\nconst tipo = String(inc.tipo || 'ERROR').toUpperCase();\nconst valorBase = (inc.valor && typeof inc.valor === 'object') ? inc.valor : {};\nconst rawErrors = Array.isArray(valorBase.errors) ? valorBase.errors : [];\nlet filteredErrors = rawErrors;\nif (rawErrors.length) {\n    filteredErrors = rawErrors.filter((err) => {\n        const text = String(err);\n        return !text.startsWith('intervalo_irregular_') && !text.startsWith('hueco_temporal_') && text !== 'intervalo_fuera_rango';\n    });\n    if (filteredErrors.length === 0) {\n        return null;\n    }\n}\nconst detalleSource = filteredErrors.length ? filteredErrors.join('; ') : String(inc.detalle || 'incidencia_detectada');\nconst detalle = detalleSource.slice(0, 255);\nconst valor = JSON.stringify({\n    ...valorBase,\n    errors: filteredErrors\n});\n\nmsg.topic = 'INSERT INTO incidencias (medicion_id, id_habitacion, tipo_incidencia, detalle_incidencia, valor_detectado) VALUES (?, ?, ?, ?, ?)';\nmsg.payload = [\n    medicionId,\n    idHabitacion,\n    tipo,\n    detalle,\n    valor\n];\nmsg.queryType = 'insert_incidencia';\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1970,
+    "y": 200,
+    "wires": [["c1e5b49a2f3c111e"]]
+  },
+  {
+    "id": "c1e5b49a2f3c111e",
+    "type": "mysql",
+    "z": "c1e5b49a2f3c1111",
+    "mydb": "d9f3d61e3a4c0aaa",
+    "name": "mysql insert incidencia",
+    "x": 2190,
+    "y": 200,
+    "wires": [["c1e5b49a2f3c111f"]]
+  },
+  {
+    "id": "c1e5b49a2f3c111f",
+    "type": "function",
+    "z": "c1e5b49a2f3c1111",
+    "name": "update bruta limpio",
+    "func": "const medicionId = Number(msg.medicionesBrutasId);\nif (!Number.isFinite(medicionId) || medicionId <= 0) {\n    return null;\n}\nmsg.topic = 'UPDATE mediciones_brutas SET limpio = 1 WHERE id = ?';\nmsg.payload = [medicionId];\nmsg.queryType = 'update_bruta';\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 2380,
+    "y": 140,
+    "wires": [["c1e5b49a2f3c1120"]]
+  },
+  {
+    "id": "c1e5b49a2f3c1120",
+    "type": "mysql",
+    "z": "c1e5b49a2f3c1111",
+    "mydb": "d9f3d61e3a4c0aaa",
+    "name": "mysql update limpio",
+    "x": 2610,
+    "y": 140,
+    "wires": [["c1e5b49a2f3c1121"]]
+  },
+  {
+    "id": "c1e5b49a2f3c1121",
+    "type": "debug",
+    "z": "c1e5b49a2f3c1111",
+    "name": "debug update limpio",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 2830,
+    "y": 140,
+    "wires": []
+  },
+  {
+    "id": "c1e5b49a2f3c1122",
+    "type": "debug",
+    "z": "c1e5b49a2f3c1111",
+    "name": "limpieza sin registros",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1110,
+    "y": 200,
+    "wires": []
+  },
+  {
+    "id": "b7c4f7c2aebc1110",
+    "type": "inject",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "ANALISIS MENSUAL (ULTIMO MES)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "ANALISIS_MENSUAL",
+    "payloadType": "str",
+    "x": 260,
+    "y": 1000,
+    "wires": [["e5b3a6d0b2c81110"]]
+  },
+  {
+    "id": "b7c4f7c2aebc1120",
+    "type": "http in",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "POST analisis mensual API",
+    "url": "/api/analisis/mensual",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 240,
+    "y": 1060,
+    "wires": [["b7c4f7c2aebc1121"]]
+  },
+  {
+    "id": "b7c4f7c2aebc1121",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "ack analisis mensual API",
+    "func": "const requestedAt = new Date().toISOString();\n\nconst runMsg = {\n    payload: 'ANALISIS_MENSUAL',\n    source: 'api',\n    requested_at: requestedAt\n};\n\nconst responseMsg = {\n    ...msg,\n    statusCode: 202,\n    headers: {\n        'Content-Type': 'application/json'\n    },\n    payload: {\n        ok: true,\n        action: 'ANALISIS_MENSUAL',\n        message: 'Analisis mensual iniciado',\n        requested_at: requestedAt\n    }\n};\n\nreturn [runMsg, responseMsg];",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 520,
+    "y": 1060,
+    "wires": [["e5b3a6d0b2c81110"], ["b7c4f7c2aebc1122"]]
+  },
+  {
+    "id": "b7c4f7c2aebc1122",
+    "type": "http response",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "response analisis mensual API",
+    "statusCode": "",
+    "headers": {},
+    "x": 790,
+    "y": 1060,
+    "wires": []
+  },
+  {
+    "id": "e5b3a6d0b2c81110",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "build SQL analisis 30d",
+    "func": "msg.topic = 'SELECT b.id_habitacion, b.timestamp_origen, l.temperatura_c, l.humedad_pct, l.fosfina_mq135, l.co_mq7 FROM mediciones_limpias l INNER JOIN mediciones_brutas b ON b.id = l.medicion_id WHERE b.timestamp_origen >= DATE_SUB(NOW(), INTERVAL 30 DAY)';\nmsg.queryType = 'select_analisis_30d';\nmsg.payload = [];\nreturn msg;",
+    "outputs": 1,
+    "timeout": "",
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 540,
+    "y": 1000,
+    "wires": [["8c0b2a1d5e1f1110"]]
+  },
+  {
+    "id": "8c0b2a1d5e1f1110",
+    "type": "mysql",
+    "z": "b7d6c0b9c8cf00d5",
+    "mydb": "d9f3d61e3a4c0aaa",
+    "name": "mysql select analisis 30d",
+    "x": 790,
+    "y": 1000,
+    "wires": [["5c2b1f7e0a2d1110"]]
+  },
+  {
+    "id": "5c2b1f7e0a2d1110",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "calcular analisis 30d",
+    "func": "const rows = Array.isArray(msg.payload) ? msg.payload : [];\nif (rows.length === 0) {\n    node.warn('analisis 30d sin datos');\n    return null;\n}\n\nconst sensors = ['temperatura_c', 'humedad_pct', 'fosfina_mq135', 'co_mq7'];\nconst tempRange = { min: 18, max: 25 };\nconst humRange = { min: 30, max: 60 };\n\nfunction toDate(raw) {\n    const dt = new Date(raw);\n    return Number.isFinite(dt.getTime()) ? dt : null;\n}\n\nfunction toSqlDate(dt) {\n    return dt ? dt.toISOString().slice(0, 19).replace('T', ' ') : null;\n}\n\nfunction round(value, digits = 2) {\n    return Number.isFinite(value) ? Number(value.toFixed(digits)) : null;\n}\n\nfunction mean(arr) {\n    if (!arr.length) return null;\n    return arr.reduce((sum, v) => sum + v, 0) / arr.length;\n}\n\nfunction variance(arr, avg) {\n    if (!arr.length) return null;\n    const m = Number.isFinite(avg) ? avg : mean(arr);\n    if (!Number.isFinite(m)) return null;\n    return arr.reduce((sum, v) => sum + Math.pow(v - m, 2), 0) / arr.length;\n}\n\nfunction stddev(arr, avg) {\n    const v = variance(arr, avg);\n    return Number.isFinite(v) ? Math.sqrt(v) : null;\n}\n\nfunction sorted(arr) {\n    return arr.slice().sort((a, b) => a - b);\n}\n\nfunction quantile(sortedArr, q) {\n    if (!sortedArr.length) return null;\n    const pos = (sortedArr.length - 1) * q;\n    const base = Math.floor(pos);\n    const rest = pos - base;\n    if (sortedArr[base + 1] !== undefined) {\n        return sortedArr[base] + rest * (sortedArr[base + 1] - sortedArr[base]);\n    }\n    return sortedArr[base];\n}\n\nfunction median(arr) {\n    return quantile(sorted(arr), 0.5);\n}\n\nfunction mode(arr) {\n    if (!arr.length) return null;\n    const counts = {};\n    let best = null;\n    let bestCount = 0;\n    for (const v of arr) {\n        const key = Number(v).toFixed(2);\n        counts[key] = (counts[key] || 0) + 1;\n        if (counts[key] > bestCount) {\n            bestCount = counts[key];\n            best = Number(key);\n        }\n    }\n    return best;\n}\n\nfunction iqrBounds(arr) {\n    if (arr.length < 4) return { lower: null, upper: null, q1: null, q3: null };\n    const s = sorted(arr);\n    const q1 = quantile(s, 0.25);\n    const q3 = quantile(s, 0.75);\n    const iqr = q3 - q1;\n    return { lower: q1 - 1.5 * iqr, upper: q3 + 1.5 * iqr, q1, q3 };\n}\n\nfunction percentileBounds(arr, lowQ, highQ) {\n    if (arr.length < 4) return { low: null, high: null };\n    const s = sorted(arr);\n    return { low: quantile(s, lowQ), high: quantile(s, highQ) };\n}\n\nfunction addCount(map, key) {\n    const k = String(key);\n    map[k] = (map[k] || 0) + 1;\n}\n\nfunction peakKey(map) {\n    let best = null;\n    let bestCount = -1;\n    for (const [k, v] of Object.entries(map)) {\n        if (v > bestCount) {\n            bestCount = v;\n            best = k;\n        }\n    }\n    return best;\n}\n\nfunction pearson(pairs) {\n    if (pairs.length < 3) return null;\n    let sx = 0;\n    let sy = 0;\n    for (const [x, y] of pairs) {\n        sx += x;\n        sy += y;\n    }\n    const mx = sx / pairs.length;\n    const my = sy / pairs.length;\n    let num = 0;\n    let dx = 0;\n    let dy = 0;\n    for (const [x, y] of pairs) {\n        const vx = x - mx;\n        const vy = y - my;\n        num += vx * vy;\n        dx += vx * vx;\n        dy += vy * vy;\n    }\n    if (dx === 0 || dy === 0) return null;\n    return num / Math.sqrt(dx * dy);\n}\n\nconst rooms = {};\n\nfunction ensureRoom(id) {\n    if (!rooms[id]) {\n        rooms[id] = {\n            id_habitacion: id,\n            total: 0,\n            minTs: null,\n            maxTs: null,\n            values: {},\n            series: {},\n            pairs: { temp_hum: [], fosfina_co: [] }\n        };\n        for (const s of sensors) {\n            rooms[id].values[s] = [];\n            rooms[id].series[s] = [];\n        }\n    }\n    return rooms[id];\n}\n\nfor (const r of rows) {\n    const id = String(r.id_habitacion || '').trim();\n    if (!id) continue;\n    const ts = toDate(r.timestamp_origen);\n    if (!ts) continue;\n    const room = ensureRoom(id);\n    room.total += 1;\n    if (!room.minTs || ts < room.minTs) room.minTs = ts;\n    if (!room.maxTs || ts > room.maxTs) room.maxTs = ts;\n\n    const temp = Number(r.temperatura_c);\n    const hum = Number(r.humedad_pct);\n    const fos = Number(r.fosfina_mq135);\n    const co = Number(r.co_mq7);\n\n    if (Number.isFinite(temp)) {\n        room.values.temperatura_c.push(temp);\n        room.series.temperatura_c.push({ ts, value: temp });\n    }\n    if (Number.isFinite(hum)) {\n        room.values.humedad_pct.push(hum);\n        room.series.humedad_pct.push({ ts, value: hum });\n    }\n    if (Number.isFinite(fos)) {\n        room.values.fosfina_mq135.push(fos);\n        room.series.fosfina_mq135.push({ ts, value: fos });\n    }\n    if (Number.isFinite(co)) {\n        room.values.co_mq7.push(co);\n        room.series.co_mq7.push({ ts, value: co });\n    }\n    if (Number.isFinite(temp) && Number.isFinite(hum)) {\n        room.pairs.temp_hum.push([temp, hum]);\n    }\n    if (Number.isFinite(fos) && Number.isFinite(co)) {\n        room.pairs.fosfina_co.push([fos, co]);\n    }\n}\n\nconst dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];\nconst analysisRows = [];\n\nfunction analyzeSeries(seriesArr, bounds, range, extremeBounds) {\n    const data = seriesArr.slice().sort((a, b) => a.ts - b.ts);\n    let outRange = 0;\n    let anomalies = 0;\n    const hourCounts = {};\n    const dayCounts = {};\n    let maxStreak = 0;\n    let streak = 0;\n\n    for (const item of data) {\n        const v = item.value;\n        const isOutRange = range\n            ? (v < range.min || v > range.max)\n            : (Number.isFinite(extremeBounds.low) && Number.isFinite(extremeBounds.high)\n                ? (v < extremeBounds.low || v > extremeBounds.high)\n                : false);\n        if (isOutRange) outRange += 1;\n\n        const isAnom = bounds.lower !== null && (v < bounds.lower || v > bounds.upper);\n        if (isAnom) {\n            anomalies += 1;\n            addCount(hourCounts, item.ts.getHours());\n            addCount(dayCounts, dayNames[item.ts.getDay()]);\n            streak += 1;\n            if (streak > maxStreak) maxStreak = streak;\n        } else {\n            streak = 0;\n        }\n    }\n\n    return { outRange, anomalies, hourCounts, dayCounts, maxStreak };\n}\n\nfunction categoryCountsRange(arr, range) {\n    const counts = { baja: 0, normal: 0, alta: 0 };\n    for (const v of arr) {\n        if (v < range.min) counts.baja += 1;\n        else if (v > range.max) counts.alta += 1;\n        else counts.normal += 1;\n    }\n    return counts;\n}\n\nfunction categoryCountsQuartiles(arr, q1, q3) {\n    if (!Number.isFinite(q1) || !Number.isFinite(q3)) return null;\n    const counts = { baja: 0, media: 0, alta: 0 };\n    for (const v of arr) {\n        if (v < q1) counts.baja += 1;\n        else if (v > q3) counts.alta += 1;\n        else counts.media += 1;\n    }\n    return counts;\n}\n\nfunction meanByPeriod(seriesArr, cutoff, isAfter) {\n    const values = seriesArr.filter((p) => isAfter ? p.ts > cutoff : p.ts <= cutoff).map((p) => p.value);\n    return mean(values);\n}\n\nfor (const room of Object.values(rooms)) {\n    const values = room.values;\n    const series = room.series;\n\n    const tempStats = {\n        mean: mean(values.temperatura_c),\n        median: median(values.temperatura_c),\n        mode: mode(values.temperatura_c),\n        min: values.temperatura_c.length ? Math.min(...values.temperatura_c) : null,\n        max: values.temperatura_c.length ? Math.max(...values.temperatura_c) : null\n    };\n    const humStats = {\n        mean: mean(values.humedad_pct),\n        median: median(values.humedad_pct),\n        mode: mode(values.humedad_pct),\n        min: values.humedad_pct.length ? Math.min(...values.humedad_pct) : null,\n        max: values.humedad_pct.length ? Math.max(...values.humedad_pct) : null\n    };\n    const fosStats = {\n        mean: mean(values.fosfina_mq135),\n        median: median(values.fosfina_mq135),\n        mode: mode(values.fosfina_mq135),\n        min: values.fosfina_mq135.length ? Math.min(...values.fosfina_mq135) : null,\n        max: values.fosfina_mq135.length ? Math.max(...values.fosfina_mq135) : null\n    };\n    const coStats = {\n        mean: mean(values.co_mq7),\n        median: median(values.co_mq7),\n        mode: mode(values.co_mq7),\n        min: values.co_mq7.length ? Math.min(...values.co_mq7) : null,\n        max: values.co_mq7.length ? Math.max(...values.co_mq7) : null\n    };\n\n    const tempVar = variance(values.temperatura_c, tempStats.mean);\n    const humVar = variance(values.humedad_pct, humStats.mean);\n    const fosVar = variance(values.fosfina_mq135, fosStats.mean);\n    const coVar = variance(values.co_mq7, coStats.mean);\n\n    const tempBounds = iqrBounds(values.temperatura_c);\n    const humBounds = iqrBounds(values.humedad_pct);\n    const fosBounds = iqrBounds(values.fosfina_mq135);\n    const coBounds = iqrBounds(values.co_mq7);\n\n    const fosExtreme = percentileBounds(values.fosfina_mq135, 0.1, 0.9);\n    const coExtreme = percentileBounds(values.co_mq7, 0.1, 0.9);\n\n    const tempAnalysis = analyzeSeries(series.temperatura_c, tempBounds, tempRange, { low: null, high: null });\n    const humAnalysis = analyzeSeries(series.humedad_pct, humBounds, humRange, { low: null, high: null });\n    const fosAnalysis = analyzeSeries(series.fosfina_mq135, fosBounds, null, fosExtreme);\n    const coAnalysis = analyzeSeries(series.co_mq7, coBounds, null, coExtreme);\n\n    const cutoff = room.maxTs ? new Date(room.maxTs.getTime() - 15 * 24 * 60 * 60 * 1000) : null;\n    const comparacion = cutoff ? {\n        periodo_a: { inicio: toSqlDate(room.minTs), fin: toSqlDate(cutoff) },\n        periodo_b: { inicio: toSqlDate(cutoff), fin: toSqlDate(room.maxTs) },\n        deltas: {\n            temp_promedio: round(meanByPeriod(series.temperatura_c, cutoff, true) - meanByPeriod(series.temperatura_c, cutoff, false), 2),\n            hum_promedio: round(meanByPeriod(series.humedad_pct, cutoff, true) - meanByPeriod(series.humedad_pct, cutoff, false), 2),\n            fosfina_promedio: round(meanByPeriod(series.fosfina_mq135, cutoff, true) - meanByPeriod(series.fosfina_mq135, cutoff, false), 2),\n            co_promedio: round(meanByPeriod(series.co_mq7, cutoff, true) - meanByPeriod(series.co_mq7, cutoff, false), 2)\n        }\n    } : null;\n\n    const distribucion = {\n        temperatura_c: categoryCountsRange(values.temperatura_c, tempRange),\n        humedad_pct: categoryCountsRange(values.humedad_pct, humRange),\n        fosfina_mq135: categoryCountsQuartiles(values.fosfina_mq135, fosBounds.q1, fosBounds.q3),\n        co_mq7: categoryCountsQuartiles(values.co_mq7, coBounds.q1, coBounds.q3)\n    };\n\n    const patrones = {\n        temperatura_c: {\n            hora_pico_anomalias: peakKey(tempAnalysis.hourCounts),\n            dia_pico_anomalias: peakKey(tempAnalysis.dayCounts),\n            max_racha_anomalias: tempAnalysis.maxStreak\n        },\n        humedad_pct: {\n            hora_pico_anomalias: peakKey(humAnalysis.hourCounts),\n            dia_pico_anomalias: peakKey(humAnalysis.dayCounts),\n            max_racha_anomalias: humAnalysis.maxStreak\n        },\n        fosfina_mq135: {\n            hora_pico_anomalias: peakKey(fosAnalysis.hourCounts),\n            dia_pico_anomalias: peakKey(fosAnalysis.dayCounts),\n            max_racha_anomalias: fosAnalysis.maxStreak\n        },\n        co_mq7: {\n            hora_pico_anomalias: peakKey(coAnalysis.hourCounts),\n            dia_pico_anomalias: peakKey(coAnalysis.dayCounts),\n            max_racha_anomalias: coAnalysis.maxStreak\n        }\n    };\n\n    const corrTempHum = pearson(room.pairs.temp_hum);\n    const corrFosCo = pearson(room.pairs.fosfina_co);\n\n    const relaciones = {\n        corr_temp_hum: round(corrTempHum, 4),\n        corr_fosfina_co: round(corrFosCo, 4),\n        n_temp_hum: room.pairs.temp_hum.length,\n        n_fosfina_co: room.pairs.fosfina_co.length\n    };\n\n    const justificacion = {\n        temperatura_c: {\n            tendencia_central: 'Serie continua; promedio, mediana y moda describen el nivel tipico.',\n            dispersion: 'Rango, varianza y desviacion muestran variabilidad termica.',\n            frecuencia: 'Conteos fuera del rango 18-25C reflejan confort.',\n            temporal: 'Horas y dias pico de anomalias indican patrones operativos.',\n            relacion: 'Relacion con humedad apoya diagnostico ambiental.',\n            anomalias: 'IQR detecta valores atipicos sin asumir distribucion.'\n        },\n        humedad_pct: {\n            tendencia_central: 'Promedio y mediana resumen humedad habitual.',\n            dispersion: 'Rango y desviacion evidencian oscilaciones.',\n            frecuencia: 'Fuera de 30-60% identifica condiciones criticas.',\n            temporal: 'Picos de anomalias muestran episodios de riesgo.',\n            relacion: 'Relacion con temperatura aporta contexto.',\n            anomalias: 'IQR identifica lecturas inusuales.'\n        },\n        fosfina_mq135: {\n            tendencia_central: 'Valores crudos requieren resumen robusto.',\n            dispersion: 'Varianza y rango reflejan cambios de gas.',\n            frecuencia: 'Extremos se estiman con percentiles p10/p90.',\n            temporal: 'Picos de anomalias sugieren eventos puntuales.',\n            relacion: 'Relacion con CO ayuda a validar episodios.',\n            anomalias: 'IQR resalta lecturas fuera de lo comun.'\n        },\n        co_mq7: {\n            tendencia_central: 'Promedio y mediana resumen carga de gas.',\n            dispersion: 'Rango y desviacion muestran volatilidad.',\n            frecuencia: 'Extremos se basan en percentiles p10/p90.',\n            temporal: 'Horas/dias pico permiten detectar patrones.',\n            relacion: 'Relacion con fosfina revela eventos compartidos.',\n            anomalias: 'IQR identifica picos inesperados.'\n        }\n    };\n\n    const limitaciones = {\n        ventana: 'Analisis limitado a los ultimos 30 dias por habitacion.',\n        datos: 'Si hay huecos de muestreo, las estadisticas pueden sesgarse.',\n        moda: 'Moda aproximada por redondeo a 2 decimales.',\n        gases: 'Fosfina/CO usan percentiles por falta de umbrales crudos.',\n        correlaciones: 'Correlaciones nulas si no hay variabilidad suficiente.'\n    };\n\n    analysisRows.push({\n        id_habitacion: room.id_habitacion,\n        periodo_dias: 30,\n        total_registros: room.total,\n        fecha_inicio_analisis: toSqlDate(room.minTs),\n        fecha_fin_analisis: toSqlDate(room.maxTs),\n        fecha_generacion: toSqlDate(new Date()),\n        temp_promedio: round(tempStats.mean),\n        temp_mediana: round(tempStats.median),\n        temp_moda: round(tempStats.mode),\n        temp_minima: round(tempStats.min),\n        temp_maxima: round(tempStats.max),\n        temp_rango: round((Number.isFinite(tempStats.max) && Number.isFinite(tempStats.min)) ? tempStats.max - tempStats.min : null),\n        temp_stddev: round(stddev(values.temperatura_c, tempStats.mean)),\n        temp_varianza: round(tempVar),\n        temp_fuera_rango: tempAnalysis.outRange,\n        temp_anomalias: tempAnalysis.anomalies,\n        hum_promedio: round(humStats.mean),\n        hum_mediana: round(humStats.median),\n        hum_moda: round(humStats.mode),\n        hum_minima: round(humStats.min),\n        hum_maxima: round(humStats.max),\n        hum_rango: round((Number.isFinite(humStats.max) && Number.isFinite(humStats.min)) ? humStats.max - humStats.min : null),\n        hum_stddev: round(stddev(values.humedad_pct, humStats.mean)),\n        hum_varianza: round(humVar),\n        hum_fuera_rango: humAnalysis.outRange,\n        hum_anomalias: humAnalysis.anomalies,\n        fosfina_promedio: round(fosStats.mean),\n        fosfina_mediana: round(fosStats.median),\n        fosfina_moda: round(fosStats.mode),\n        fosfina_minima: round(fosStats.min),\n        fosfina_maxima: round(fosStats.max),\n        fosfina_rango: round((Number.isFinite(fosStats.max) && Number.isFinite(fosStats.min)) ? fosStats.max - fosStats.min : null),\n        fosfina_stddev: round(stddev(values.fosfina_mq135, fosStats.mean)),\n        fosfina_varianza: round(fosVar),\n        fosfina_fuera_rango: fosAnalysis.outRange,\n        fosfina_anomalias: fosAnalysis.anomalies,\n        co_promedio: round(coStats.mean),\n        co_mediana: round(coStats.median),\n        co_moda: round(coStats.mode),\n        co_minima: round(coStats.min),\n        co_maxima: round(coStats.max),\n        co_rango: round((Number.isFinite(coStats.max) && Number.isFinite(coStats.min)) ? coStats.max - coStats.min : null),\n        co_stddev: round(stddev(values.co_mq7, coStats.mean)),\n        co_varianza: round(coVar),\n        co_fuera_rango: coAnalysis.outRange,\n        co_anomalias: coAnalysis.anomalies,\n        corr_temp_hum: round(corrTempHum, 4),\n        corr_fosfina_co: round(corrFosCo, 4),\n        distribucion_categorias: distribucion,\n        patrones_temporales: patrones,\n        relaciones_variables: relaciones,\n        comparacion_periodos: comparacion,\n        justificacion_analisis: justificacion,\n        limitaciones\n    });\n}\n\nmsg.payload = analysisRows;\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1040,
+    "y": 1000,
+    "wires": [["5b1c7a9e0c2f1110"]]
+  },
+  {
+    "id": "5b1c7a9e0c2f1110",
+    "type": "split",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "split analisis por habitacion",
+    "splt": "\n",
+    "spltType": "str",
+    "arraySplt": 1,
+    "arraySpltType": "len",
+    "stream": false,
+    "addname": "",
+    "x": 1290,
+    "y": 1000,
+    "wires": [["6f1b2c8d0a2f1110"]]
+  },
+  {
+    "id": "6f1b2c8d0a2f1110",
+    "type": "function",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "build insert analisis 30d",
+    "func": "const row = msg.payload || {};\nif (!row.id_habitacion) return null;\n\nfunction jsonOrNull(value) {\n    if (value === null || value === undefined) return null;\n    return JSON.stringify(value);\n}\n\nconst columns = [\n    'id_habitacion',\n    'periodo_dias',\n    'total_registros',\n    'fecha_inicio_analisis',\n    'fecha_fin_analisis',\n    'fecha_generacion',\n    'temp_promedio',\n    'temp_mediana',\n    'temp_moda',\n    'temp_minima',\n    'temp_maxima',\n    'temp_rango',\n    'temp_stddev',\n    'temp_varianza',\n    'temp_fuera_rango',\n    'temp_anomalias',\n    'hum_promedio',\n    'hum_mediana',\n    'hum_moda',\n    'hum_minima',\n    'hum_maxima',\n    'hum_rango',\n    'hum_stddev',\n    'hum_varianza',\n    'hum_fuera_rango',\n    'hum_anomalias',\n    'fosfina_promedio',\n    'fosfina_mediana',\n    'fosfina_moda',\n    'fosfina_minima',\n    'fosfina_maxima',\n    'fosfina_rango',\n    'fosfina_stddev',\n    'fosfina_varianza',\n    'fosfina_fuera_rango',\n    'fosfina_anomalias',\n    'co_promedio',\n    'co_mediana',\n    'co_moda',\n    'co_minima',\n    'co_maxima',\n    'co_rango',\n    'co_stddev',\n    'co_varianza',\n    'co_fuera_rango',\n    'co_anomalias',\n    'corr_temp_hum',\n    'corr_fosfina_co',\n    'distribucion_categorias',\n    'patrones_temporales',\n    'relaciones_variables',\n    'comparacion_periodos',\n    'justificacion_analisis',\n    'limitaciones'\n];\n\nconst values = [\n    row.id_habitacion,\n    row.periodo_dias,\n    row.total_registros,\n    row.fecha_inicio_analisis,\n    row.fecha_fin_analisis,\n    row.fecha_generacion,\n    row.temp_promedio,\n    row.temp_mediana,\n    row.temp_moda,\n    row.temp_minima,\n    row.temp_maxima,\n    row.temp_rango,\n    row.temp_stddev,\n    row.temp_varianza,\n    row.temp_fuera_rango,\n    row.temp_anomalias,\n    row.hum_promedio,\n    row.hum_mediana,\n    row.hum_moda,\n    row.hum_minima,\n    row.hum_maxima,\n    row.hum_rango,\n    row.hum_stddev,\n    row.hum_varianza,\n    row.hum_fuera_rango,\n    row.hum_anomalias,\n    row.fosfina_promedio,\n    row.fosfina_mediana,\n    row.fosfina_moda,\n    row.fosfina_minima,\n    row.fosfina_maxima,\n    row.fosfina_rango,\n    row.fosfina_stddev,\n    row.fosfina_varianza,\n    row.fosfina_fuera_rango,\n    row.fosfina_anomalias,\n    row.co_promedio,\n    row.co_mediana,\n    row.co_moda,\n    row.co_minima,\n    row.co_maxima,\n    row.co_rango,\n    row.co_stddev,\n    row.co_varianza,\n    row.co_fuera_rango,\n    row.co_anomalias,\n    row.corr_temp_hum,\n    row.corr_fosfina_co,\n    jsonOrNull(row.distribucion_categorias),\n    jsonOrNull(row.patrones_temporales),\n    jsonOrNull(row.relaciones_variables),\n    jsonOrNull(row.comparacion_periodos),\n    jsonOrNull(row.justificacion_analisis),\n    jsonOrNull(row.limitaciones)\n];\n\nconst placeholders = values.map(() => '?').join(', ');\nmsg.topic = `INSERT INTO analisis_mediciones (${columns.join(', ')}) VALUES (${placeholders})`;\nmsg.payload = values;\nmsg.queryType = 'insert_analisis';\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1530,
+    "y": 1000,
+    "wires": [["dca3b24a91085534"]]
+  },
+  {
+    "id": "c2d9e3f7d0a61110",
+    "type": "debug",
+    "z": "b7d6c0b9c8cf00d5",
+    "name": "debug mysql insert analisis",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload.affectedRows",
+    "targetType": "msg",
+    "statusVal": "payload.affectedRows",
+    "statusType": "msg",
+    "x": 1340,
+    "y": 740,
+    "wires": []
+  }
+]

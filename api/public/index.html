@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hotel IoT Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Space+Grotesk:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <div>
+          <p class="kicker">Control en tiempo real</p>
+          <h1>Hotel IoT Dashboard</h1>
+          <p class="subtitle">Monitoreo, riesgo y control de estado por nodo.</p>
+        </div>
+        <div class="status" id="connectionStatus">
+          <span class="dot"></span>
+          <span>Conectando...</span>
+        </div>
+      </header>
+
+      <nav class="tabs">
+        <button class="tab active" data-page="dashboard">Dashboard</button>
+        <button class="tab" data-page="analysis">Analisis de datos</button>
+      </nav>
+
+      <section id="dashboardPage" class="page page-dashboard active">
+        <section class="filters">
+          <div class="filter">
+            <label for="searchInput">Buscar nodo</label>
+            <input id="searchInput" placeholder="HTL-N-P1-201" />
+          </div>
+          <div class="filter">
+            <label for="contextFilter">Contexto</label>
+            <select id="contextFilter">
+              <option value="">Todos</option>
+              <option value="LIBRE">LIBRE</option>
+              <option value="RESERVADA">RESERVADA</option>
+              <option value="FUMIGACION">FUMIGACION</option>
+            </select>
+          </div>
+          <div class="filter">
+            <label for="riskFilter">Riesgo</label>
+            <select id="riskFilter">
+              <option value="">Todos</option>
+              <option value="NORMAL">NORMAL</option>
+              <option value="ALERTA">ALERTA</option>
+              <option value="EMERGENCIA">EMERGENCIA</option>
+              <option value="INVALIDO">INVALIDO</option>
+            </select>
+          </div>
+          <button id="refreshBtn" class="ghost">Actualizar</button>
+        </section>
+
+        <main class="layout">
+          <section class="panel list-panel">
+            <div class="panel-header">
+              <h2>Nodos activos</h2>
+              <span id="nodeCount" class="pill">0</span>
+            </div>
+            <div id="nodesList" class="nodes-list"></div>
+          </section>
+
+          <section class="panel detail-panel">
+            <div class="panel-header detail-header">
+              <div>
+                <h2 id="detailTitle">Selecciona un nodo</h2>
+                <p id="detailMeta" class="meta">Estado y últimos valores</p>
+              </div>
+              <div class="detail-right">
+                <div class="status-tile">
+                  <span class="label">Estado habitacion</span>
+                  <strong id="detailContext">-</strong>
+                </div>
+                <div class="status-tile compact">
+                  <span class="label">Riesgo</span>
+                  <strong id="detailRisk">-</strong>
+                </div>
+                <div class="status-tile motivo-inline">
+                  <span class="label">Motivo activacion</span>
+                  <strong id="motivoText">Sin eventos recientes.</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="detail-body">
+              <div class="controls">
+                <div class="state-buttons">
+                  <button data-state="LIBRE" class="state">LIBRE</button>
+                  <button data-state="RESERVADA" class="state">RESERVADA</button>
+                  <button data-state="FUMIGACION" class="state">FUMIGACION</button>
+                </div>
+                <div class="status-message command-chip" id="actionStatus">
+                  <span class="label">Comando</span>
+                  <span class="value">Sin comandos</span>
+                </div>
+              </div>
+
+              <div class="charts">
+                <div class="chart-card">
+                  <h3>Ambiente</h3>
+                  <canvas id="envChart"></canvas>
+                </div>
+                <div class="chart-card">
+                  <h3>Gases</h3>
+                  <canvas id="gasChart"></canvas>
+                </div>
+              </div>
+
+              <div class="packet-section">
+                <h3>Últimos 50 paquetes</h3>
+                <div id="packetLog" class="table packet-log"></div>
+              </div>
+
+              <div class="incidents">
+                <h3>Ultimas incidencias</h3>
+                <div id="incidentsList" class="incident-list">Sin incidencias.</div>
+              </div>
+            </div>
+          </section>
+        </main>
+      </section>
+
+      <section id="analysisPage" class="page page-analysis">
+        <div class="analysis-layout">
+          <section class="panel summary-panel">
+            <div class="panel-header">
+              <h2>Analisis de datos</h2>
+            </div>
+            <div class="analysis-toolbar" aria-label="Acciones de analisis">
+              <button id="monthlyAnalysisBtn" class="action-primary" type="button">Generar analisis mensual</button>
+              <button id="cleanBtn" class="action-secondary" type="button">Limpiar lote (100)</button>
+              <button id="analysisRefresh" class="ghost" type="button">Actualizar</button>
+            </div>
+            <div class="analysis-statuses">
+              <div class="status-message" id="monthlyAnalysisStatus">
+                <span class="label">Analisis</span>
+                <span class="value">Sin ejecuciones.</span>
+              </div>
+              <div class="status-message" id="cleanStatus">
+                <span class="label">Limpieza</span>
+                <span class="value">Sin ejecuciones.</span>
+              </div>
+            </div>
+            <div class="summary-cards">
+              <div class="summary-card">
+                <span>Brutas</span>
+                <strong id="countBrutas">0</strong>
+                <small>Ultimo: <span id="ultimaBruta">--</span></small>
+              </div>
+              <div class="summary-card warning">
+                <span>Pendientes</span>
+                <strong id="countPendientes">0</strong>
+                <small>Por limpiar en lotes de 100</small>
+              </div>
+              <div class="summary-card">
+                <span>Limpias</span>
+                <strong id="countLimpias">0</strong>
+                <small>Ultimo: <span id="ultimaLimpia">--</span></small>
+              </div>
+              <div class="summary-card">
+                <span>Incidencias</span>
+                <strong id="countIncidencias">0</strong>
+                <small>Ultimo: <span id="ultimaIncidencia">--</span></small>
+              </div>
+              <div class="summary-card">
+                <span>Analisis</span>
+                <strong id="countAnalisis">0</strong>
+                <small>Ultimo: <span id="ultimaAnalisis">--</span></small>
+              </div>
+              <div class="summary-card">
+                <span>Eventos</span>
+                <strong id="countEventos">0</strong>
+                <small>Ultimo: <span id="ultimoEvento">--</span></small>
+              </div>
+            </div>
+            <div class="insights-grid">
+              <div class="insight-card">
+                <h3>Calidad</h3>
+                <div id="qualityBreakdown" class="breakdown-list">Sin datos.</div>
+              </div>
+              <div class="insight-card">
+                <h3>Riesgo</h3>
+                <div id="riskBreakdown" class="breakdown-list">Sin datos.</div>
+              </div>
+              <div class="insight-card">
+                <h3>Incidencias por tipo</h3>
+                <div id="incidentTypeBreakdown" class="breakdown-list">Sin datos.</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel data-panel" aria-labelledby="dataTablesTitle">
+            <div class="data-panel-header">
+              <div>
+                <p class="kicker">Tablas</p>
+                <h2 id="dataTablesTitle">Datos de analisis</h2>
+              </div>
+            </div>
+            <div class="table-tabs" role="tablist" aria-label="Tablas de analisis de datos">
+              <button id="tab-pendientes" class="table-tab active" type="button" role="tab" aria-selected="true" aria-controls="panel-pendientes" data-table-tab="pendientes">
+                Pendientes <span id="tabPendingCount">0</span>
+              </button>
+              <button id="tab-incidencias" class="table-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-incidencias" data-table-tab="incidencias">
+                Incidencias <span id="tabIncidenciasCount">0</span>
+              </button>
+              <button id="tab-limpias" class="table-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-limpias" data-table-tab="limpias">
+                Limpias <span id="tabLimpiasCount">0</span>
+              </button>
+              <button id="tab-analisis" class="table-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-analisis" data-table-tab="analisis">
+                Analisis mensual <span id="tabAnalisisCount">0</span>
+              </button>
+              <button id="tab-eventos" class="table-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-eventos" data-table-tab="eventos">
+                Eventos <span id="tabEventosCount">0</span>
+              </button>
+            </div>
+            <div id="panel-pendientes" class="table-panel active" role="tabpanel" aria-labelledby="tab-pendientes" data-table-panel="pendientes" tabindex="0">
+              <div class="data-section">
+                <h3>Brutas pendientes de limpieza</h3>
+                <div id="pendingTable" class="table"></div>
+              </div>
+            </div>
+            <div id="panel-incidencias" class="table-panel" role="tabpanel" aria-labelledby="tab-incidencias" data-table-panel="incidencias" tabindex="0" hidden>
+              <div class="data-section">
+                <h3>Incidencias recientes</h3>
+                <div id="incidenciasTable" class="table"></div>
+              </div>
+            </div>
+            <div id="panel-limpias" class="table-panel" role="tabpanel" aria-labelledby="tab-limpias" data-table-panel="limpias" tabindex="0" hidden>
+              <div class="data-section">
+                <h3>Datos limpios recientes</h3>
+                <div id="limpiasTable" class="table"></div>
+              </div>
+            </div>
+            <div id="panel-analisis" class="table-panel" role="tabpanel" aria-labelledby="tab-analisis" data-table-panel="analisis" tabindex="0" hidden>
+              <div class="data-section">
+                <h3>Analisis mensual</h3>
+                <div id="analisisTable" class="table"></div>
+              </div>
+            </div>
+            <div id="panel-eventos" class="table-panel" role="tabpanel" aria-labelledby="tab-eventos" data-table-panel="eventos" tabindex="0" hidden>
+              <div class="data-section">
+                <h3>Eventos actuadores recientes</h3>
+                <div id="eventosTable" class="table"></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+    </div>
+
+    <script src="/vendor/chart.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

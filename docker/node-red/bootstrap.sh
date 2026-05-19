@@ -12,9 +12,11 @@ SYNC_SETTINGS_FROM_SEED="${SYNC_SETTINGS_FROM_SEED:-true}"
 : "${MQTT_PASS:?MQTT_PASS is required}"
 : "${MYSQL_USER:?MYSQL_USER is required}"
 : "${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}"
+: "${NODE_RED_CREDENTIAL_SECRET:?NODE_RED_CREDENTIAL_SECRET is required}"
 
 MQTT_CONFIG_NODE_ID="${MQTT_CONFIG_NODE_ID:-a1b2c3d4e5f60111}"
 MYSQL_CONFIG_NODE_ID="${MYSQL_CONFIG_NODE_ID:-d9f3d61e3a4c0aaa}"
+export MQTT_CONFIG_NODE_ID MYSQL_CONFIG_NODE_ID
 
 is_true() {
   case "${1:-}" in
@@ -31,17 +33,29 @@ if is_true "$SYNC_SETTINGS_FROM_SEED" && [ -f "$SEED_SETTINGS_FILE" ]; then
   cp "$SEED_SETTINGS_FILE" /data/settings.js
 fi
 
-cat > "$CRED_FILE" <<EOF
-{
-  "${MQTT_CONFIG_NODE_ID}": {
-    "user": "${MQTT_USER}",
-    "password": "${MQTT_PASS}"
+node <<'NODE'
+const crypto = require('crypto');
+const fs = require('fs');
+
+const credentials = {
+  [process.env.MQTT_CONFIG_NODE_ID]: {
+    user: process.env.MQTT_USER,
+    password: process.env.MQTT_PASS
   },
-  "${MYSQL_CONFIG_NODE_ID}": {
-    "user": "${MYSQL_USER}",
-    "password": "${MYSQL_PASSWORD}"
+  [process.env.MYSQL_CONFIG_NODE_ID]: {
+    user: process.env.MYSQL_USER,
+    password: process.env.MYSQL_PASSWORD
   }
-}
-EOF
+};
+
+const key = crypto.createHash('sha256').update(process.env.NODE_RED_CREDENTIAL_SECRET).digest();
+const initVector = crypto.randomBytes(16);
+const cipher = crypto.createCipheriv('aes-256-ctr', key, initVector);
+const encrypted = {
+  $: initVector.toString('hex') + cipher.update(JSON.stringify(credentials), 'utf8', 'base64') + cipher.final('base64')
+};
+
+fs.writeFileSync('/data/flows_cred.json', JSON.stringify(encrypted, null, 2) + '\n');
+NODE
 
 exec /usr/src/node-red/entrypoint.sh
