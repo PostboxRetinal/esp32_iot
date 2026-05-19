@@ -64,5 +64,5 @@ Node-RED distingue la fuente exclusivamente por `device_id`.
 
 - Maqiatto requiere usar tópicos bajo tu prefijo de usuario.
 - En este proyecto, ese prefijo se define con `MQTT_TOPIC_BASE`.
-- Ejemplo recomendado en `infrastructure/.env`:
+- Ejemplo recomendado en `.env`:
   - `MQTT_TOPIC_BASE=tu_usuario_maqiatto/fiot/garage`

@@ -61,6 +61,48 @@ services:
     depends_on:
       - mariadb
 
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    image: fiot-api:1.0.0
+    container_name: fiot-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      TZ: ${TZ:-America/Bogota}
+      PORT: 3000
+      API_CORS_ORIGIN: ${API_CORS_ORIGIN:-http://localhost:5173}
+      MYSQL_HOST: ${MYSQL_HOST:-mariadb}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-fiot_garage}
+      MYSQL_USER: ${MYSQL_USER:-fiot_app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change_me_fiot_app}
+      MQTT_BROKER_HOST: ${MQTT_BROKER_HOST:-maqiatto.com}
+      MQTT_BROKER_PORT: ${MQTT_BROKER_PORT:-1883}
+      MQTT_TOPIC_BASE: ${MQTT_TOPIC_BASE:-your_maqiatto_username/fiot/garage}
+      MQTT_COMMAND_TOPIC: ${MQTT_COMMAND_TOPIC:-your_maqiatto_username/fiot/garage/commands}
+      HARDWARE_DEVICE_ID: ${HARDWARE_DEVICE_ID:-ESP32-GARAGE-CO-001}
+    ports:
+      - "${API_PORT:-3000}:3000"
+    depends_on:
+      - mariadb
+
+  dashboard:
+    build:
+      context: ./apps/dashboard
+      dockerfile: Dockerfile
+    image: fiot-dashboard:1.0.0
+    container_name: fiot-dashboard
+    restart: unless-stopped
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3000}
+    ports:
+      - "${DASHBOARD_PORT:-5173}:5173"
+    depends_on:
+      - api
+
 volumes:
   mariadb_data:
   nodered_data:

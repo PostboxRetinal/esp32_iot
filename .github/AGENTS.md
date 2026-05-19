@@ -1,7 +1,7 @@
 # Repository Notes
 
 ## Shape
-- Two runtimes live here: ESP32 Arduino firmware in `src/main.cpp` using PlatformIO env `esp32-s3-n16r8-uart`, and a Node-RED/MariaDB stack in `nodered/` plus `database/schema.sql`.
+- Four runtimes live here: ESP32 Arduino firmware in `src/main.cpp` using PlatformIO env `esp32-s3-n16r8-uart`, Node-RED in `nodered/`, MariaDB schema in `database/schema.sql`, Elysia API in `apps/api`, and React dashboard in `apps/dashboard`.
 - Active firmware config is `include/app_config.h`; `src/main.cpp` includes that file, not `include/config.h`.
 - Node-RED uses `nodered/flows.json` as a template. `nodered/seed-data.js` replaces `${...}` tokens and reads `CO_*` threshold defines from `include/app_config.h` during container seeding.
 - MQTT topics must stay under `MQTT_TOPIC_BASE`, which must include the Maqiatto username prefix. Node-RED distinguishes hardware vs simulator by `device_id` only.
@@ -13,7 +13,9 @@
 - Seed script syntax check: `node --check nodered/seed-data.js`
 - Entrypoint shell syntax check: `sh -n nodered/auto-import-entrypoint.sh`
 - Flow JSON syntax check: `node -e 'JSON.parse(require("fs").readFileSync("nodered/flows.json", "utf8"))'`
-- No npm scripts, tests, linter, formatter, CI, or pre-commit config were found; use the targeted checks above instead of inventing `npm test` or lint commands.
+- API typecheck: `cd apps/api && bun install && bun run typecheck`
+- Dashboard build: `cd apps/dashboard && bun install && bun run build`
+- No root-level test, linter, formatter, CI, or pre-commit config was found; use targeted checks instead of inventing root `npm test` or lint commands.
 
 ## Deployment Gotchas
 - Current files are root `.env.example` and `podman-compose.yml`, while several docs still mention `infrastructure/.env` and `infrastructure/docker-compose.yml`. Trust checked-in config over those stale prose paths.

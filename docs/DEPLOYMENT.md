@@ -17,6 +17,8 @@ Desde la raíz del proyecto, iniciar stack:
 
 - MariaDB (persistencia)
 - Node-RED (ingesta/procesamiento/simulador)
+- ElysiaJS API (REST para apps externas)
+- Dashboard ReactTS (visualización web)
 - Broker MQTT externo: Maqiatto (`maqiatto.com`)
 
 > Nota: `fiot-nodered` se construye con `nodered/Dockerfile` para dejar preinstalado `node-red-node-mysql` siguiendo el enfoque oficial de imagen personalizada.
@@ -32,6 +34,12 @@ Detener y limpiar:
 - `podman-compose --env-file .env -f podman-compose.yml down`
 
 > Nota: en algunos sistemas `podman compose` delega a `docker-compose` y requiere socket de Podman. Para evitar ese problema, este proyecto usa el wrapper `podman-compose` dentro del virtualenv dedicado.
+
+Servicios expuestos:
+
+- Node-RED: `http://localhost:1880`
+- API ElysiaJS: `http://localhost:3000/api/health`
+- Dashboard ReactTS: `http://localhost:5173`
 
 ## 3) Importación automática del flujo (sin pasos manuales)
 

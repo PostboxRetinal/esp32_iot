@@ -89,9 +89,17 @@ Nota de conversión MQ-7:
   - Orquestado con `podman-compose`
   - `fiot-nodered`
   - `fiot-mariadb`
+  - `fiot-api` (ElysiaJS REST API)
+  - `fiot-dashboard` (ReactTS dashboard)
 - Broker MQTT externo: `maqiatto.com`
 - `nodered/flows.json` (procesamiento y simulación)
 - `database/schema.sql` (modelo relacional)
+
+Interfaces Parcial 3:
+
+- API REST: `http://localhost:3000/api/health`
+- Dashboard web: `http://localhost:5173`
+- Evidencia: `docs/PARCIAL3.md`
 
 ## Firmware ESP32-S3 N16R8
 
