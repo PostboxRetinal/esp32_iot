@@ -190,14 +190,13 @@ String clasificarEstado(float co_ppm, int pir) {
 
 void publishTelemetry(int rawCO, float co_ppm, int pir, const String& estado) {
   JsonDocument doc;
+  doc["message_id"] = ++messageCounter;
   doc["device_id"] = DEVICE_ID;
   doc["timestamp"] = getTimestamp();
-  doc["co_ppm"] = roundf(co_ppm * 10.0f) / 10.0f;
   doc["presencia"] = (pir == 1) ? "SI" : "NO";
-  doc["estado"] = estado;
+  doc["co_ppm"] = roundf(co_ppm * 10.0f) / 10.0f;
   doc["raw_co_adc"] = rawCO;
-  doc["adc_saturated"] = (rawCO >= MQ7_ADC_SATURATION_RAW);
-  doc["message_id"] = ++messageCounter;
+  doc["estado"] = estado;
 
   char payload[384];
   size_t len = serializeJson(doc, payload, sizeof(payload));

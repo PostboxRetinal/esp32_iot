@@ -12,7 +12,7 @@ import {
   XAxis,
   YAxis
 } from "recharts";
-import { Bell } from "lucide-react";
+import { Bell, ExternalLink } from "lucide-react";
 import { Toaster, toast } from "sonner";
 
 import "@fontsource/jetbrains-mono/latin-400.css";
@@ -88,28 +88,45 @@ type AlertToastLike = Pick<Alert, "device_id" | "device_timestamp" | "severity" 
 type AlertToastTheme = {
   background: string;
   border: string;
+  accent: string;
   color: string;
 };
 
-const alertToastThemes: Record<string, AlertToastTheme> = {
-  CO_CRITICO: {
-    background: "#000000",
-    border: "1px solid #262626",
-    color: "#fafafa"
+const alertToastThemes: Record<Alert["severity"], AlertToastTheme> = {
+  INFO: {
+    background: "rgba(56, 189, 248, 0.08)",
+    border: "rgba(56, 189, 248, 0.38)",
+    accent: "#38bdf8",
+    color: "#e0f2fe"
   },
-  CRITICO_URGENTE: {
-    background: "#000000",
-    border: "1px solid #262626",
-    color: "#fafafa"
+  LOW: {
+    background: "rgba(52, 211, 153, 0.08)",
+    border: "rgba(52, 211, 153, 0.38)",
+    accent: "#34d399",
+    color: "#d1fae5"
+  },
+  MEDIUM: {
+    background: "rgba(251, 191, 36, 0.10)",
+    border: "rgba(251, 191, 36, 0.42)",
+    accent: "#fbbf24",
+    color: "#fef3c7"
+  },
+  HIGH: {
+    background: "rgba(251, 146, 60, 0.12)",
+    border: "rgba(251, 146, 60, 0.50)",
+    accent: "#fb923c",
+    color: "#ffedd5"
+  },
+  CRITICAL: {
+    background: "rgba(251, 113, 133, 0.12)",
+    border: "rgba(251, 113, 133, 0.52)",
+    accent: "#fb7185",
+    color: "#ffe4e6"
   }
 };
 
-function getAlertToastTheme(alertType: string): AlertToastTheme {
-  return alertToastThemes[alertType] || {
-    background: "#000000",
-    border: "1px solid #262626",
-    color: "#fafafa"
-  };
+function getAlertToastTheme(severity: Alert["severity"]): AlertToastTheme {
+  return alertToastThemes[severity];
 }
 
 function alertSignature(alert: AlertToastLike) {
@@ -119,11 +136,12 @@ function alertSignature(alert: AlertToastLike) {
 function notifyAlert(alert: AlertToastLike) {
   const title = `${alert.device_id} · ${alert.alert_type}`;
   const description = `${alert.message} · ${fmt(alert.co_ppm, " ppm")}`;
-  const theme = getAlertToastTheme(alert.alert_type);
+  const theme = getAlertToastTheme(alert.severity);
   const toastStyle = {
     background: theme.background,
-    border: theme.border,
-    color: theme.color
+    border: `1px solid ${theme.border}`,
+    color: theme.color,
+    boxShadow: `inset 3px 0 0 ${theme.accent}`
   };
   const toastClassNames = {
     toast: "alert-toast",
@@ -133,6 +151,11 @@ function notifyAlert(alert: AlertToastLike) {
 
   if (alert.severity === "CRITICAL" || alert.severity === "HIGH") {
     toast.error(title, { description, style: toastStyle, classNames: toastClassNames });
+    return;
+  }
+
+  if (alert.severity === "MEDIUM") {
+    toast.warning(title, { description, style: toastStyle, classNames: toastClassNames });
     return;
   }
 
@@ -328,9 +351,9 @@ function App() {
     <main className="shell">
       <header className="hero">
         <div>
-          <p className="eyebrow">Fundamentos de IoT · Parcial 3</p>
-          <h1>Garage CO Observatory</h1>
-          <p className="subtitle">Dashboard React consumiendo la API Elysia sobre MariaDB, con Node-RED como plataforma IoT.</p>
+          <p className="eyebrow">Dashboard de monitoreo remoto para niveles de Monóxido de Carbono en garajes</p>
+          <h1>¡Bienvenido!</h1>
+          <p className="subtitle">Desarrollado en viteJS + shadCN, consumiendo REST API ElysiaJS sobre MariaDB, con Node-RED como backend, 100% compose ;)</p>
         </div>
         <Card className="status-card">
           <DropdownMenu>
@@ -412,7 +435,7 @@ function App() {
 
       <section className="metrics">
         <Card className="metric primary">
-          <span>CO actual</span>
+          <span>Nivel de Monóxido de Carbono (CO) actual</span>
           <strong>{fmt(latest?.co_ppm, " ppm")}</strong>
           <small>{latest?.device_id || "sin lecturas"}</small>
         </Card>
@@ -436,7 +459,7 @@ function App() {
       <section className="grid two">
         <Card className="panel chart-panel">
           <div className="panel-head">
-            <h2>CO por minuto</h2>
+            <h2>Nivel de Monóxido de Carbono (CO) por minuto (ppm)</h2>
             <span>últimas 24h</span>
           </div>
           <ResponsiveContainer width="100%" height={lineChartHeight}>
@@ -445,8 +468,8 @@ function App() {
               <XAxis dataKey="label" stroke="#94a3b8" minTickGap={28} tickLine={false} axisLine={false} />
               <YAxis stroke="#94a3b8" tickLine={false} axisLine={false} />
               <Tooltip contentStyle={{ background: "#111827", border: "1px solid #243041", borderRadius: 12 }} />
-              <Line type="monotone" dataKey="avg_co_ppm" name="CO promedio" stroke="#38bdf8" strokeWidth={2.5} dot={false} />
-              <Line type="monotone" dataKey="max_co_ppm" name="CO max" stroke="#fb7185" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="avg_co_ppm" name="CO promedio (ppm)" stroke="#38bdf8" strokeWidth={2.5} dot={false} />
+              <Line type="monotone" dataKey="max_co_ppm" name="CO max (ppm)" stroke="#fb7185" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </Card>
@@ -527,7 +550,12 @@ function App() {
         <Card className="panel">
           <div className="panel-head">
             <h2>Nodos</h2>
-            <a href="http://localhost:1880" target="_blank" rel="noreferrer">Node-RED</a>
+            <Button asChild className="gap-2 border-cyan-400/50 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/20 hover:text-cyan-50" size="sm" variant="outline">
+              <a href="http://localhost:1880" target="_blank" rel="noreferrer">
+                Abrir Node-RED
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            </Button>
           </div>
           <div className="list">
             {data.devices.map((device) => (

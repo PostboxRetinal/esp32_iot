@@ -480,6 +480,20 @@ h1 {
   color: #a1a1aa;
 }
 
+.alert-toast {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.alert-toast-title {
+  color: inherit;
+  font-weight: 800;
+}
+
+.alert-toast-description {
+  color: rgba(255, 255, 255, 0.78);
+}
+
 @media (max-width: 1000px) {
   .hero { flex-direction: column; }
   .metrics { grid-template-columns: 1fr 1fr; }

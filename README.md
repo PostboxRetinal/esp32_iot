@@ -98,7 +98,8 @@ Nota de conversión MQ-7:
 Interfaces Parcial 3:
 
 - API REST: `http://localhost:3000/api/health`
-- Dashboard web: `http://localhost:5173`
+- Dashboard web: `http://localhost:5173` (ReactTS + Tailwind + Shadcn/UI + Sonner)
+- UI "Sleek Minimalist": Tema oscuro con notificaciones por severidad y SSE real-time.
 - Evidencia: `docs/PARCIAL3.md`
 
 ## Firmware ESP32-S3 N16R8

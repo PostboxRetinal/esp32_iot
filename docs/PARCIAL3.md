@@ -68,8 +68,9 @@ El dashboard principal se implementa con Bun + ReactTS en `apps/dashboard`.
 
 - URL local: `http://localhost:5173`
 - Consume exclusivamente la API REST de ElysiaJS.
-- Suscribe alertas en tiempo real vía SSE y las muestra con `sonner`.
-- Presenta métricas actuales, serie temporal de CO, distribución de estados, nodos activos, alertas y controles de ventilación.
+- **Alertas en tiempo real**: Suscripción vía SSE (`/api/alerts/stream`), categorizadas por severidad (`INFO`, `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) y mostradas mediante `sonner` con estilos CSS minimalistas.
+- **Estado de nodos**: Cálculo en tiempo real (`online` si `last_seen_at` >= `NOW()` - 90s, caso contrario `offline`).
+- **UI**: Diseño "Sleek Minimalist" con Tailwind y Shadcn/UI.
 - Enlaza Node-RED en `http://localhost:1880` como plataforma IoT de procesamiento.
 
 Se decidió no usar Node-RED Dashboard. Node-RED queda como plataforma IoT y la visualización se realiza en una aplicación web React, aceptando la desviación frente al literal del PDF.
