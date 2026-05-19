@@ -1,6 +1,9 @@
-.pio
+# Folders
+.pio/
 .vscode/
+__pycache__/
+node_modules/
+
+# Vars
 .env
 include/config.h
-node_modules/
-api/node_modules/
