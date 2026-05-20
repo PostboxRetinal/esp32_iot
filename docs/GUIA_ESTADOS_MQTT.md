@@ -37,6 +37,7 @@ Comando mínimo (ESP32):
 
 Campos disponibles:
 - `estado`: `LIBRE`, `RESERVADA`, `FUMIGACION`
+- `estado_riesgo`: `NORMAL`, `ALERTA`, `EMERGENCIA` (opcional; activa los LEDs de riesgo)
 - `sample_interval_ms`: frecuencia de envío en ms
 - `intervalo_ms`: alias compatible para frecuencia
 - `id_habitacion`: opcional (si viene y no coincide, el comando se ignora)
@@ -44,6 +45,10 @@ Campos disponibles:
 Notas:
 - `estado` debe venir en mayúsculas para ser aceptado.
 - Los comandos solo usan `estado` y `sample_interval_ms` (o `intervalo_ms`).
+- Cuando el comando incluye `estado_riesgo`, el ESP32 enciende:
+  - `NORMAL` -> LED verde (`GPIO 12`)
+  - `ALERTA` -> LED blanco (`GPIO 13`)
+  - `EMERGENCIA` -> LED rojo (`GPIO 5`)
 
 Rangos:
 - intervalo mínimo: `1000` ms

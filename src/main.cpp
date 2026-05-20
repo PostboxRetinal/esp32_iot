@@ -14,6 +14,9 @@
 #define MQ7_ANALOG_PIN 35
 #define PIR_DIGITAL_PIN 25
 #define LED_INTEGRADO 2
+#define LED_RIESGO_WHITE 13
+#define LED_RIESGO_GREEN 12
+#define LED_RIESGO_RED 5
 
 // ==========================================
 // 2. FRECUENCIA DE ENVÍO DE TELEMETRÍA (RAW)
@@ -88,6 +91,42 @@ void parpadearLedFeedback(int veces = 2, int onMs = 100, int offMs = 100)
   }
 }
 
+void apagarLedsRiesgo()
+{
+  digitalWrite(LED_RIESGO_WHITE, LOW);
+  digitalWrite(LED_RIESGO_GREEN, LOW);
+  digitalWrite(LED_RIESGO_RED, LOW);
+}
+
+bool aplicarEstadoRiesgo(const String &estadoRiesgo)
+{
+  String riesgo = estadoRiesgo;
+  riesgo.trim();
+  riesgo.toUpperCase();
+
+  apagarLedsRiesgo();
+
+  if (riesgo == "NORMAL")
+  {
+    digitalWrite(LED_RIESGO_GREEN, HIGH);
+    return true;
+  }
+
+  if (riesgo == "ALERTA")
+  {
+    digitalWrite(LED_RIESGO_WHITE, HIGH);
+    return true;
+  }
+
+  if (riesgo == "EMERGENCIA")
+  {
+    digitalWrite(LED_RIESGO_RED, HIGH);
+    return true;
+  }
+
+  return false;
+}
+
 // ==========================================
 // 4. CALLBACK: ESCUCHA DEL SISTEMA EXTERNO
 // ==========================================
@@ -158,6 +197,21 @@ void callback(char *topic, byte *payload, unsigned int length)
     procesado = true;
   }
 
+  String nuevoEstadoRiesgo = docCmd["estado_riesgo"] | "";
+  if (nuevoEstadoRiesgo.length() > 0)
+  {
+    if (aplicarEstadoRiesgo(nuevoEstadoRiesgo))
+    {
+      nuevoEstadoRiesgo.toUpperCase();
+      Serial.println("LEDs de riesgo actualizados a: " + nuevoEstadoRiesgo);
+      procesado = true;
+    }
+    else
+    {
+      Serial.println("ERROR: estado_riesgo desconocido. LEDs apagados.");
+    }
+  }
+
   if (!procesado)
   {
     Serial.println("ERROR: Comando/estado desconocido. Ignorando...");
@@ -208,7 +262,11 @@ void setup()
   pinMode(MQ7_ANALOG_PIN, INPUT);
   pinMode(PIR_DIGITAL_PIN, INPUT);
   pinMode(LED_INTEGRADO, OUTPUT);
+  pinMode(LED_RIESGO_WHITE, OUTPUT);
+  pinMode(LED_RIESGO_GREEN, OUTPUT);
+  pinMode(LED_RIESGO_RED, OUTPUT);
   digitalWrite(LED_INTEGRADO, LOW);
+  apagarLedsRiesgo();
 
   dht11.setup(DHT11_PIN, DHTesp::DHT11);
 
