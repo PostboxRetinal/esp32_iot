@@ -42,7 +42,7 @@ Valor para el problema: permite identificar periodos de mayor concentración de 
 
 ## 4. Interfaces REST
 
-La API REST está implementada 100% en Node-RED dentro de `nodered/flows.json`, usando nodos `http in`, `function`, `mysql`, `mqtt out` y `http response`.
+La API REST está implementada 100% en Node-RED dentro de `nodered/flows.json`, usando nodos `http in`, `function`, `mysql`, `mqtt out` y `http response`. Todas las rutas `/api/*` requieren el header `Authorization: Bearer <token>` donde `<token>` es el valor de `API_BEARER_TOKEN` definido en `.env` (generar con `openssl rand -hex 32`).
 
 | Método | Ruta | Propósito |
 | --- | --- | --- |
@@ -58,13 +58,15 @@ La API REST está implementada 100% en Node-RED dentro de `nodered/flows.json`, 
 | GET | `/api/commands/recent?limit=` | Auditoría reciente de comandos |
 | POST | `/api/commands/ventilation` | Publicar comando MQTT de ventilación |
 
-Las operaciones se pueden probar en Postman usando `http://localhost:1880` como base URL. Los ejemplos `curl` equivalen a las mismas solicitudes REST.
+Las operaciones se pueden probar en Postman usando `http://localhost:1880` como base URL y añadiendo el header `Authorization: Bearer <token>`. Los ejemplos `curl` equivalen a las mismas solicitudes REST con el header de autorización.
 
 Ejemplo de comando:
 
 ```sh
+TOKEN="01d288152eea8327efae2b12ff8de01f78c4d1043791ea5b8efb364064d61a4d"  # valor de API_BEARER_TOKEN en .env
 curl -X POST http://localhost:1880/api/commands/ventilation \
   -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"action":"ENCENDER","reason":"Prueba desde API"}'
 ```
 

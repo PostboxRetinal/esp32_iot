@@ -9,6 +9,7 @@ RUN chown -R node-red:root /data
 
 COPY --chown=node-red:root flows.json /opt/fiot-seed/flows.template.json
 COPY --chown=node-red:root seed-data.js /opt/fiot-seed/seed-data.js
+COPY --chown=node-red:root settings.js /opt/fiot-seed/settings.js
 COPY --chown=node-red:root auto-import-entrypoint.sh /usr/local/bin/auto-import-entrypoint.sh
 RUN chmod +x /usr/local/bin/auto-import-entrypoint.sh
 

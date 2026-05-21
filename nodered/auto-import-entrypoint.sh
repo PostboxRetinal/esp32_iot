@@ -14,15 +14,15 @@ DB_WAIT_TIMEOUT_SEC="${DB_WAIT_TIMEOUT_SEC:-30}"
 DB_WAIT_INTERVAL_SEC="${DB_WAIT_INTERVAL_SEC:-1}"
 
 if [ "${DB_WAIT_ENABLED}" = "true" ] || [ "${DB_WAIT_ENABLED}" = "1" ]; then
-  DB_HOST="${MYSQL_HOST:-mariadb}"
-  DB_PORT="${MYSQL_PORT:-3306}"
+  DB_HOST="${MARIADB_HOST:-mariadb}"
+  DB_PORT="${MARIADB_PORT:-3306}"
   echo "[fiot-nodered] Waiting for MariaDB at ${DB_HOST}:${DB_PORT} (timeout ${DB_WAIT_TIMEOUT_SEC}s)..."
 
   if ! node <<'NODE'
 const net = require("net");
 
-const host = process.env.MYSQL_HOST || "mariadb";
-const port = Number(process.env.MYSQL_PORT || "3306");
+const host = process.env.MARIADB_HOST || "mariadb";
+const port = Number(process.env.MARIADB_PORT || "3306");
 const timeoutSec = Number(process.env.DB_WAIT_TIMEOUT_SEC || "90");
 const intervalSec = Math.max(1, Number(process.env.DB_WAIT_INTERVAL_SEC || "1"));
 const deadline = Date.now() + timeoutSec * 1000;
@@ -88,15 +88,29 @@ NODE
 fi
 
 if [ "${AUTO_IMPORT}" = "true" ] || [ "${AUTO_IMPORT}" = "1" ]; then
-  TEMPLATE_HASH="$(node -e 'const fs = require("fs"); const crypto = require("crypto"); const file = process.argv[1]; const data = fs.readFileSync(file); process.stdout.write(crypto.createHash("sha256").update(data).digest("hex"));' "${TEMPLATE_PATH}")"
-  SEEDED_TEMPLATE_HASH=""
-  if [ -f "${SEED_HASH_MARKER}" ]; then
-    SEEDED_TEMPLATE_HASH="$(node -e 'const fs = require("fs"); const file = process.argv[1]; process.stdout.write(fs.readFileSync(file, "utf8").trim());' "${SEED_HASH_MARKER}")"
+  if [ ! -f "${DATA_DIR}/settings.js" ] && [ -f "${SEED_DIR}/settings.js" ]; then
+    cp "${SEED_DIR}/settings.js" "${DATA_DIR}/settings.js"
+    echo "[fiot-nodered] settings.js seeded into /data"
   fi
 
-  if [ "${FORCE_IMPORT}" = "true" ] || [ "${FORCE_IMPORT}" = "1" ] || [ ! -f "${SEED_MARKER}" ] || [ "${TEMPLATE_HASH}" != "${SEEDED_TEMPLATE_HASH}" ]; then
+  SEED_HASH="$(node -e '
+    const fs = require("fs");
+    const crypto = require("crypto");
+    const files = [process.argv[1], process.argv[2], process.argv[3]];
+    const hash = crypto.createHash("sha256");
+    for (const f of files) {
+      hash.update(fs.readFileSync(f));
+    }
+    process.stdout.write(hash.digest("hex"));
+  ' "${TEMPLATE_PATH}" "${SEED_DIR}/seed-data.js" "${SEED_DIR}/settings.js")"
+  SEEDED_HASH=""
+  if [ -f "${SEED_HASH_MARKER}" ]; then
+    SEEDED_HASH="$(node -e 'const fs = require("fs"); const file = process.argv[1]; process.stdout.write(fs.readFileSync(file, "utf8").trim());' "${SEED_HASH_MARKER}")"
+  fi
+
+  if [ "${FORCE_IMPORT}" = "true" ] || [ "${FORCE_IMPORT}" = "1" ] || [ ! -f "${SEED_MARKER}" ] || [ "${SEED_HASH}" != "${SEEDED_HASH}" ]; then
     node "${SEED_DIR}/seed-data.js"
-    printf '%s\n' "${TEMPLATE_HASH}" > "${SEED_HASH_MARKER}"
+    printf '%s\n' "${SEED_HASH}" > "${SEED_HASH_MARKER}"
     date -u +"%Y-%m-%dT%H:%M:%SZ" > "${SEED_MARKER}"
     echo "[fiot-nodered] Flow + credentials seeded into /data"
   fi

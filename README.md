@@ -101,7 +101,7 @@ Nota de conversión MQ-7:
 
 ## Interfaces Parcial 3
 
-- API REST Node-RED: `http://localhost:1880/api/health`
+- API REST Node-RED: `http://localhost:1880/api/*` (requiere header `Authorization: Bearer <token>` donde `<token>` es el valor de `API_BEARER_TOKEN` definido en `.env`; generar con `openssl rand -hex 32`)
 - Dashboard web: `http://localhost:5173` (ReactTS + Tailwind + Shadcn/UI + Sonner)
 - UI "Sleek Minimalist": tema oscuro con notificaciones por severidad y actualización periódica desde REST
 

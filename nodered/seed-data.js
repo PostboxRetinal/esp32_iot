@@ -1,11 +1,14 @@
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 const dataDir = process.env.NODE_RED_USER_DIR || "/data";
 const templatePath = "/opt/fiot-seed/flows.template.json";
 const firmwareConfigHeaderPath = process.env.FIRMWARE_CONFIG_HEADER || "/opt/fiot-seed/app_config.h";
 const outputFlowPath = path.join(dataDir, "flows.json");
 const outputCredPath = path.join(dataDir, "flows_cred.json");
+
+const encryptionAlgorithm = "aes-256-ctr";
 
 const thresholdKeys = [
   "CO_SEGURO_MAX_PPM",
@@ -17,14 +20,14 @@ const thresholdKeys = [
 const replacementKeys = [
   "MQTT_BROKER_HOST",
   "MQTT_BROKER_PORT",
-  "MQTT_NODERED_USER",
-  "MQTT_NODERED_PASSWORD",
+  "MQTT_USER",
+  "MQTT_PASSWORD",
   "MQTT_TOPIC_BASE",
-  "MYSQL_HOST",
-  "MYSQL_PORT",
-  "MYSQL_DATABASE",
-  "MYSQL_USER",
-  "MYSQL_PASSWORD",
+  "MARIADB_HOST",
+  "MARIADB_PORT",
+  "MARIADB_DATABASE",
+  "MARIADB_USER",
+  "MARIADB_PASSWORD",
   "HARDWARE_DEVICE_ID",
   "SIM_DEVICE_ID",
   ...thresholdKeys
@@ -124,6 +127,14 @@ function loadThresholdsFromFirmwareHeader(headerPath) {
   return resolved;
 }
 
+function encryptCredentials(credentialSecret, credentials) {
+  const key = crypto.createHash("sha256").update(credentialSecret).digest();
+  const initVector = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv(encryptionAlgorithm, key, initVector);
+  const encrypted = cipher.update(JSON.stringify(credentials), "utf8", "base64") + cipher.final("base64");
+  return { $: initVector.toString("hex") + encrypted };
+}
+
 const firmwareThresholds = loadThresholdsFromFirmwareHeader(firmwareConfigHeaderPath);
 for (const key of thresholdKeys) {
   if (firmwareThresholds[key] != null) {
@@ -143,12 +154,23 @@ if (!flowsTemplate.endsWith("\n")) {
   flowsTemplate += "\n";
 }
 
-fs.writeFileSync(outputFlowPath, flowsTemplate, "utf8");
+const flows = JSON.parse(flowsTemplate);
 
-const mqttUser = process.env.MQTT_NODERED_USER || process.env.MQTT_USER || "";
-const mqttPassword = process.env.MQTT_NODERED_PASSWORD || process.env.MQTT_PASSWORD || "";
-const mysqlUser = process.env.MYSQL_USER || "";
-const mysqlPassword = process.env.MYSQL_PASSWORD || "";
+const cleanedFlows = flows.map((node) => {
+  if (node.credentials) {
+    const cleaned = { ...node };
+    delete cleaned.credentials;
+    return cleaned;
+  }
+  return node;
+});
+
+fs.writeFileSync(outputFlowPath, JSON.stringify(cleanedFlows, null, 2) + "\n", "utf8");
+
+const mqttUser = process.env.MQTT_USER || "";
+const mqttPassword = process.env.MQTT_PASSWORD || "";
+const mariadbUser = process.env.MARIADB_USER || "";
+const mariadbPassword = process.env.MARIADB_PASSWORD || "";
 
 const flowsCredentials = {
   cfg_mqtt: {
@@ -156,9 +178,17 @@ const flowsCredentials = {
     password: mqttPassword
   },
   cfg_mysql: {
-    user: mysqlUser,
-    password: mysqlPassword
+    user: mariadbUser,
+    password: mariadbPassword
   }
 };
 
-fs.writeFileSync(outputCredPath, `${JSON.stringify(flowsCredentials, null, 2)}\n`, "utf8");
+const credentialSecret = process.env.NODE_RED_CREDENTIAL_SECRET;
+if (!credentialSecret) {
+  console.error("[fiot-nodered] NODE_RED_CREDENTIAL_SECRET is not set. Cannot encrypt credentials.");
+  process.exit(1);
+}
+
+const encrypted = encryptCredentials(credentialSecret, flowsCredentials);
+fs.writeFileSync(outputCredPath, JSON.stringify(encrypted, null, 2) + "\n", "utf8");
+console.log("[fiot-nodered] Credentials encrypted and saved to flows_cred.json");

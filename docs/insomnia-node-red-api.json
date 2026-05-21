@@ -1,0 +1,358 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-05-21T20:10:00.000Z",
+  "__export_source": "insomnia.core",
+  "resources": [
+    {
+      "_type": "workspace",
+      "_id": "wrk_fiot_nodered_api",
+      "parentId": null,
+      "name": "FIoT Node-RED API",
+      "description": "Colecci\u00f3n para probar la API REST de Node-RED del proyecto esp32_iot"
+    },
+    {
+      "_type": "environment",
+      "_id": "env_fiot_base",
+      "parentId": "wrk_fiot_nodered_api",
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:1880",
+        "hardware_device_id": "ESP32-GARAGE-CO-001",
+        "sim_device_id": "SIM-GARAGE-CO-001",
+        "device_id": "SIM-GARAGE-CO-001",
+        "alert_id": "1",
+        "hours": "24",
+        "limit": "20",
+        "command_reason": "Prueba desde Insomnia",
+        "api_bearer_token": "01d288152eea8327efae2b12ff8de01f78c4d1043791ea5b8efb364064d61a4d"
+      }
+    },
+    {
+      "_type": "request_group",
+      "_id": "fld_health",
+      "parentId": "wrk_fiot_nodered_api",
+      "name": "Health"
+    },
+    {
+      "_type": "request",
+      "_id": "req_health",
+      "parentId": "fld_health",
+      "name": "GET /api/health",
+      "description": "Estado de API, DB y configuraci\u00f3n MQTT",
+      "url": "{{ base_url }}/api/health",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ api_bearer_token }}"
+        }
+      ],
+      "body": {},
+      "authentication": {}
+    },
+    {
+      "_type": "request_group",
+      "_id": "fld_devices",
+      "parentId": "wrk_fiot_nodered_api",
+      "name": "Devices"
+    },
+    {
+      "_type": "request",
+      "_id": "req_devices",
+      "parentId": "fld_devices",
+      "name": "GET /api/devices",
+      "description": "Lista nodos y \u00faltimo estado conocido",
+      "url": "{{ base_url }}/api/devices",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ api_bearer_token }}"
+        }
+      ],
+      "body": {},
+      "authentication": {}
+    },
+    {
+      "_type": "request_group",
+      "_id": "fld_readings",
+      "parentId": "wrk_fiot_nodered_api",
+      "name": "Readings"
+    },
+    {
+      "_type": "request",
+      "_id": "req_latest_readings",
+      "parentId": "fld_readings",
+      "name": "GET /api/readings/latest",
+      "description": "\u00daltimas lecturas de sensores",
+      "url": "{{ base_url }}/api/readings/latest",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ api_bearer_token }}"
+        }
+      ],
+      "body": {},
+      "authentication": {},
+      "parameters": [
+        {
+          "name": "limit",
+          "value": "{{ limit }}",
+          "disabled": false
+        },
+        {
+          "name": "device_id",
+          "value": "{{ device_id }}",
+          "disabled": true
+        }
+      ]
+    },
+    {
+      "_type": "request_group",
+      "_id": "fld_alerts",
+      "parentId": "wrk_fiot_nodered_api",
+      "name": "Alerts"
+    },
+    {
+      "_type": "request",
+      "_id": "req_recent_alerts",
+      "parentId": "fld_alerts",
+      "name": "GET /api/alerts/recent",
+      "description": "Alertas recientes filtrables por horas y dispositivo",
+      "url": "{{ base_url }}/api/alerts/recent",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ api_bearer_token }}"
+        }
+      ],
+      "body": {},
+      "authentication": {},
+      "parameters": [
+        {
+          "name": "hours",
+          "value": "{{ hours }}",
+          "disabled": false
+        },
+        {
+          "name": "limit",
+          "value": "{{ limit }}",
+          "disabled": false
+        },
+        {
+          "name": "device_id",
+          "value": "{{ device_id }}",
+          "disabled": true
+        }
+      ]
+    },
+    {
+      "_type": "request",
+      "_id": "req_ack_alert",
+      "parentId": "fld_alerts",
+      "name": "PUT /api/alerts/:id/ack",
+      "description": "Confirmar alerta pendiente",
+      "url": "{{ base_url }}/api/alerts/{{ alert_id }}/ack",
+      "method": "PUT",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ api_bearer_token }}"
+        }
+      ],
+      "body": {},
+      "authentication": {}
+    },
+    {
+      "_type": "request",
+      "_id": "req_close_alert",
+      "parentId": "fld_alerts",
+      "name": "DELETE /api/alerts/:id",
+      "description": "Cierre l\u00f3gico de alerta",
+      "url": "{{ base_url }}/api/alerts/{{ alert_id }}",
+      "method": "DELETE",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ api_bearer_token }}"
+        }
+      ],
+      "body": {},
+      "authentication": {}
+    },
+    {
+      "_type": "request_group",
+      "_id": "fld_analytics",
+      "parentId": "wrk_fiot_nodered_api",
+      "name": "Analytics"
+    },
+    {
+      "_type": "request",
+      "_id": "req_summary",
+      "parentId": "fld_analytics",
+      "name": "GET /api/analytics/summary",
+      "description": "Resumen anal\u00edtico (promedio, m\u00e1ximo, m\u00ednimo, alertas, nodos activos)",
+      "url": "{{ base_url }}/api/analytics/summary",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ api_bearer_token }}"
+        }
+      ],
+      "body": {},
+      "authentication": {},
+      "parameters": [
+        {
+          "name": "hours",
+          "value": "{{ hours }}",
+          "disabled": false
+        },
+        {
+          "name": "device_id",
+          "value": "{{ device_id }}",
+          "disabled": true
+        }
+      ]
+    },
+    {
+      "_type": "request",
+      "_id": "req_state_distribution",
+      "parentId": "fld_analytics",
+      "name": "GET /api/analytics/state-distribution",
+      "description": "Distribuci\u00f3n de estados",
+      "url": "{{ base_url }}/api/analytics/state-distribution",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ api_bearer_token }}"
+        }
+      ],
+      "body": {},
+      "authentication": {},
+      "parameters": [
+        {
+          "name": "hours",
+          "value": "{{ hours }}",
+          "disabled": false
+        },
+        {
+          "name": "device_id",
+          "value": "{{ device_id }}",
+          "disabled": true
+        }
+      ]
+    },
+    {
+      "_type": "request",
+      "_id": "req_timeseries",
+      "parentId": "fld_analytics",
+      "name": "GET /api/analytics/timeseries",
+      "description": "Serie temporal de CO por minuto y nodo",
+      "url": "{{ base_url }}/api/analytics/timeseries",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ api_bearer_token }}"
+        }
+      ],
+      "body": {},
+      "authentication": {},
+      "parameters": [
+        {
+          "name": "hours",
+          "value": "{{ hours }}",
+          "disabled": false
+        },
+        {
+          "name": "device_id",
+          "value": "{{ device_id }}",
+          "disabled": true
+        }
+      ]
+    },
+    {
+      "_type": "request_group",
+      "_id": "fld_commands",
+      "parentId": "wrk_fiot_nodered_api",
+      "name": "Commands"
+    },
+    {
+      "_type": "request",
+      "_id": "req_recent_commands",
+      "parentId": "fld_commands",
+      "name": "GET /api/commands/recent",
+      "description": "Auditor\u00eda reciente de comandos",
+      "url": "{{ base_url }}/api/commands/recent",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ api_bearer_token }}"
+        }
+      ],
+      "body": {},
+      "authentication": {},
+      "parameters": [
+        {
+          "name": "limit",
+          "value": "{{ limit }}",
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "_type": "request",
+      "_id": "req_ventilation_on",
+      "parentId": "fld_commands",
+      "name": "POST /api/commands/ventilation (ENCENDER)",
+      "description": "Publicar comando MQTT de ventilaci\u00f3n ENCENDER",
+      "url": "{{ base_url }}/api/commands/ventilation",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ api_bearer_token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"action\": \"ENCENDER\",\n  \"device_id\": \"{{ sim_device_id }}\",\n  \"reason\": \"{{ command_reason }}\"\n}"
+      },
+      "authentication": {}
+    },
+    {
+      "_type": "request",
+      "_id": "req_ventilation_off",
+      "parentId": "fld_commands",
+      "name": "POST /api/commands/ventilation (APAGAR)",
+      "description": "Publicar comando MQTT de ventilaci\u00f3n APAGAR",
+      "url": "{{ base_url }}/api/commands/ventilation",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ api_bearer_token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"action\": \"APAGAR\",\n  \"device_id\": \"{{ sim_device_id }}\",\n  \"reason\": \"{{ command_reason }}\"\n}"
+      },
+      "authentication": {}
+    }
+  ]
+}

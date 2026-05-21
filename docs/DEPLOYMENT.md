@@ -43,8 +43,9 @@ Servicios expuestos:
 ## 3) Importación automática del flujo (sin pasos manuales)
 
 1. En el primer arranque (volumen `nodered_data` vacío), el contenedor carga automáticamente:
-  - `flows.json` en `/data/flows.json`
-  - credenciales MQTT/MySQL en `/data/flows_cred.json` usando variables de `.env`
+  - `flows.json` en `/data/flows.json` (sin credenciales inline)
+  - `flows_cred.json` cifrado en `/data/flows_cred.json` usando `NODE_RED_CREDENTIAL_SECRET` de `.env`
+  - credenciales MQTT/MySQL extraídas de variables de `.env`
   - umbrales de CO (`CO_SEGURO_MAX_PPM`, `CO_PRECAUCION_MAX_PPM`, `CO_PELIGRO_MAX_PPM`, `CO_URGENTE_MIN_PPM`) leyendo `include/app_config.h` montado en `/opt/fiot-seed/app_config.h`
   - espera activa de MariaDB antes de iniciar Node-RED para evitar errores de conexión por arranque desfasado
 2. No es necesario importar desde la UI de Node-RED para arrancar el flujo base.
@@ -53,7 +54,7 @@ Servicios expuestos:
   - eliminar el volumen `nodered_data` y volver a levantar el stack.
 
 > Importante: si ya tenías el volumen de MariaDB creado antes de esta versión, `schema.sql` no se vuelve a ejecutar automáticamente. Para incluir tablas o columnas nuevas (por ejemplo `actuator_commands` o `alerts.raw_co_adc`), aplica una migración manual o recrea el volumen `mariadb_data`.
-> Reimportación: `auto-import-entrypoint.sh` compara el hash de `flows.template.json`. Si cambia, se aplica una reimportación automática al reiniciar el contenedor de Node-RED.
+> Reimportación: `auto-import-entrypoint.sh` compara el hash combinado de `flows.template.json`, `seed-data.js` y `settings.js`. Si cambia cualquiera, se aplica una reimportación automática al reiniciar el contenedor de Node-RED.
 > Despliegue: usa `podman-compose down && podman-compose up --build -d` para asegurar que los cambios locales en el código y los volúmenes se propaguen correctamente.
 
 ## 4) Configurar firmware ESP32
@@ -90,3 +91,4 @@ También puedes ejecutar los `inject` de consulta histórica en Node-RED para ob
 - No usar credenciales por defecto en laboratorio compartido.
 - Usar credenciales dedicadas en Maqiatto.
 - Mantener los tópicos autorizados en Maqiatto bajo tu prefijo de usuario.
+- La API REST requiere `Authorization: Bearer <token>` en todas las solicitudes `/api/*`. El token se define en `API_BEARER_TOKEN` dentro de `.env` y se genera con `openssl rand -hex 32`. El dashboard React y la colección de Insomnia ya incluyen la variable correspondiente.
