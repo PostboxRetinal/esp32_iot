@@ -56,6 +56,7 @@
     estado VARCHAR(24) NOT NULL,
     message VARCHAR(255) NOT NULL,
     co_ppm DECIMAL(6,2) NOT NULL,
+    raw_co_adc INT UNSIGNED DEFAULT NULL,
     presencia TINYINT(1) NOT NULL,
     urgente TINYINT(1) NOT NULL,
     ack_status ENUM('PENDING', 'ACKED', 'CLOSED') NOT NULL DEFAULT 'PENDING',

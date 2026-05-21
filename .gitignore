@@ -1,11 +1,10 @@
 # Folders
 .pio
 .vscode
-*.pdf
-apps/**/node_modules
-apps/**/dist
+node_modules/
+dist/
 *.tsbuildinfo
 
 # Ignore environment files with sensitive information
-include/app_config.h
+*.h
 .env

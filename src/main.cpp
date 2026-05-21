@@ -6,7 +6,7 @@
 #include <math.h>
 #include <time.h>
 
-#include "app_config.h"
+#include <app_config.h>
 
 #define MQ7_PIN    4
 #define PIR_PIN    5

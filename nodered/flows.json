@@ -778,6 +778,895 @@
     "wires": []
   },
   {
+    "id": "http_api_health",
+    "type": "http in",
+    "z": "flow_parcial2",
+    "name": "GET /api/health",
+    "url": "/api/health",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 160,
+    "y": 740,
+    "wires": [
+      [
+        "fn_api_health_query"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_health_query",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API health query",
+    "func": "msg.topic = \"SELECT 1 AS ok\";\nmsg.payload = [];\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 390,
+    "y": 740,
+    "wires": [
+      [
+        "sql_api_health"
+      ]
+    ]
+  },
+  {
+    "id": "sql_api_health",
+    "type": "mysql",
+    "z": "flow_parcial2",
+    "mydb": "cfg_mysql",
+    "name": "API DB health",
+    "x": 620,
+    "y": 740,
+    "wires": [
+      [
+        "fn_api_health_response"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_health_response",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API health response",
+    "func": "const topicBase = env.get(\"MQTT_TOPIC_BASE\") || \"your_maqiatto_username/fiot/garage\";\nconst commandTopic = env.get(\"MQTT_COMMAND_TOPIC\") || `${topicBase}/commands`;\n\nmsg.payload = {\n  ok: true,\n  db: \"ok\",\n  mqtt: topicBase ? \"configured\" : \"missing_config\",\n  command_topic: commandTopic,\n  timestamp: new Date().toISOString()\n};\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 870,
+    "y": 740,
+    "wires": [
+      [
+        "fn_api_response_headers"
+      ]
+    ]
+  },
+  {
+    "id": "http_api_devices",
+    "type": "http in",
+    "z": "flow_parcial2",
+    "name": "GET /api/devices",
+    "url": "/api/devices",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 160,
+    "y": 800,
+    "wires": [
+      [
+        "fn_api_devices_query"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_devices_query",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API devices query",
+    "func": "msg.topic = `\n  SELECT\n    d.device_id,\n    d.node_type,\n    d.description,\n    d.created_at,\n    d.last_seen_at,\n    CASE\n      WHEN d.last_seen_at >= DATE_SUB(NOW(3), INTERVAL 90 SECOND) THEN 'online'\n      ELSE 'offline'\n    END AS connection_state,\n    lr.co_ppm AS latest_co_ppm,\n    lr.raw_co_adc AS latest_raw_co_adc,\n    ls.estado AS latest_estado,\n    lr.ingested_at AS latest_reading_at\n  FROM devices d\n  LEFT JOIN sensor_readings lr\n    ON lr.id = (SELECT MAX(id) FROM sensor_readings WHERE device_id = d.device_id)\n  LEFT JOIN state_events ls\n    ON ls.id = (SELECT MAX(id) FROM state_events WHERE device_id = d.device_id)\n  ORDER BY d.device_id ASC\n`;\nmsg.payload = [];\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 390,
+    "y": 800,
+    "wires": [
+      [
+        "sql_api_devices"
+      ]
+    ]
+  },
+  {
+    "id": "sql_api_devices",
+    "type": "mysql",
+    "z": "flow_parcial2",
+    "mydb": "cfg_mysql",
+    "name": "API DB devices",
+    "x": 620,
+    "y": 800,
+    "wires": [
+      [
+        "fn_api_devices_response"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_devices_response",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API devices response",
+    "func": "const toNumberOrNull = (value) => {\n  const parsed = Number(value);\n  return Number.isFinite(parsed) ? parsed : null;\n};\n\nconst rows = Array.isArray(msg.payload) ? msg.payload : [];\nmsg.payload = {\n  data: rows.map((row) => ({\n    device_id: row.device_id,\n    node_type: row.node_type,\n    description: row.description,\n    created_at: row.created_at,\n    last_seen_at: row.last_seen_at,\n    connection_state: row.connection_state,\n    latest_co_ppm: toNumberOrNull(row.latest_co_ppm),\n    latest_raw_co_adc: toNumberOrNull(row.latest_raw_co_adc),\n    latest_estado: row.latest_estado,\n    latest_reading_at: row.latest_reading_at\n  }))\n};\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 870,
+    "y": 800,
+    "wires": [
+      [
+        "fn_api_response_headers"
+      ]
+    ]
+  },
+  {
+    "id": "http_api_latest_readings",
+    "type": "http in",
+    "z": "flow_parcial2",
+    "name": "GET /api/readings/latest",
+    "url": "/api/readings/latest",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 190,
+    "y": 860,
+    "wires": [
+      [
+        "fn_api_latest_readings_query"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_latest_readings_query",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API latest readings query",
+    "func": "const parsePositiveInt = (rawValue, fallback, max) => {\n  const parsed = Number(rawValue);\n  if (!Number.isFinite(parsed) || parsed <= 0) {\n    return fallback;\n  }\n\n  return Math.min(Math.trunc(parsed), max);\n};\n\nconst query = msg.req.query || {};\nconst limit = parsePositiveInt(query.limit, 50, 500);\nconst deviceId = String(query.device_id || \"\").trim();\nconst params = [];\nlet where = \"\";\n\nif (deviceId) {\n  where = \"WHERE device_id = ?\";\n  params.push(deviceId);\n}\n\nparams.push(limit);\nmsg.topic = `\n  SELECT id, device_id, device_timestamp, co_ppm, raw_co_adc, presencia, source_topic, message_id, ingested_at\n  FROM sensor_readings\n  ${where}\n  ORDER BY id DESC\n  LIMIT ?\n`;\nmsg.payload = params;\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 430,
+    "y": 860,
+    "wires": [
+      [
+        "sql_api_latest_readings"
+      ]
+    ]
+  },
+  {
+    "id": "sql_api_latest_readings",
+    "type": "mysql",
+    "z": "flow_parcial2",
+    "mydb": "cfg_mysql",
+    "name": "API DB latest readings",
+    "x": 680,
+    "y": 860,
+    "wires": [
+      [
+        "fn_api_latest_readings_response"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_latest_readings_response",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API latest readings response",
+    "func": "const toNumberOrNull = (value) => {\n  const parsed = Number(value);\n  return Number.isFinite(parsed) ? parsed : null;\n};\n\nconst rows = Array.isArray(msg.payload) ? msg.payload : [];\nmsg.payload = {\n  data: rows.map((row) => ({\n    id: Number(row.id),\n    device_id: row.device_id,\n    device_timestamp: row.device_timestamp,\n    co_ppm: toNumberOrNull(row.co_ppm),\n    raw_co_adc: toNumberOrNull(row.raw_co_adc),\n    presencia: Number(row.presencia),\n    source_topic: row.source_topic,\n    message_id: toNumberOrNull(row.message_id),\n    ingested_at: row.ingested_at\n  }))\n};\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 960,
+    "y": 860,
+    "wires": [
+      [
+        "fn_api_response_headers"
+      ]
+    ]
+  },
+  {
+    "id": "http_api_recent_alerts",
+    "type": "http in",
+    "z": "flow_parcial2",
+    "name": "GET /api/alerts/recent",
+    "url": "/api/alerts/recent",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 190,
+    "y": 920,
+    "wires": [
+      [
+        "fn_api_recent_alerts_query"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_recent_alerts_query",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API recent alerts query",
+    "func": "const parsePositiveInt = (rawValue, fallback, max) => {\n  const parsed = Number(rawValue);\n  if (!Number.isFinite(parsed) || parsed <= 0) {\n    return fallback;\n  }\n\n  return Math.min(Math.trunc(parsed), max);\n};\n\nconst query = msg.req.query || {};\nconst hours = parsePositiveInt(query.hours, 24, 720);\nconst limit = parsePositiveInt(query.limit, 50, 500);\nconst deviceId = String(query.device_id || \"\").trim();\nconst params = [hours];\nlet deviceFilter = \"\";\n\nif (deviceId) {\n  deviceFilter = \" AND device_id = ?\";\n  params.push(deviceId);\n}\n\nparams.push(limit);\nmsg.api_hours = hours;\nmsg.topic = `\n  SELECT id, device_id, device_timestamp, alert_ts, severity, estado, message,\n    co_ppm, raw_co_adc, presencia, urgente, ack_status, acked_at\n  FROM alerts\n  WHERE alert_ts >= DATE_SUB(NOW(3), INTERVAL ? HOUR)\n    ${deviceFilter}\n  ORDER BY alert_ts DESC\n  LIMIT ?\n`;\nmsg.payload = params;\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 430,
+    "y": 920,
+    "wires": [
+      [
+        "sql_api_recent_alerts"
+      ]
+    ]
+  },
+  {
+    "id": "sql_api_recent_alerts",
+    "type": "mysql",
+    "z": "flow_parcial2",
+    "mydb": "cfg_mysql",
+    "name": "API DB recent alerts",
+    "x": 680,
+    "y": 920,
+    "wires": [
+      [
+        "fn_api_recent_alerts_response"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_recent_alerts_response",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API recent alerts response",
+    "func": "const toNumberOrNull = (value) => {\n  const parsed = Number(value);\n  return Number.isFinite(parsed) ? parsed : null;\n};\n\nconst rows = Array.isArray(msg.payload) ? msg.payload : [];\nmsg.payload = {\n  hours: msg.api_hours || 24,\n  data: rows.map((row) => ({\n    id: Number(row.id),\n    device_id: row.device_id,\n    device_timestamp: row.device_timestamp,\n    alert_ts: row.alert_ts,\n    severity: row.severity,\n    estado: row.estado,\n    message: row.message,\n    co_ppm: toNumberOrNull(row.co_ppm),\n    raw_co_adc: toNumberOrNull(row.raw_co_adc),\n    presencia: Number(row.presencia),\n    urgente: Number(row.urgente),\n    ack_status: row.ack_status,\n    acked_at: row.acked_at\n  }))\n};\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 960,
+    "y": 920,
+    "wires": [
+      [
+        "fn_api_response_headers"
+      ]
+    ]
+  },
+  {
+    "id": "http_api_ack_alert",
+    "type": "http in",
+    "z": "flow_parcial2",
+    "name": "PUT /api/alerts/:id/ack",
+    "url": "/api/alerts/:id/ack",
+    "method": "put",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 200,
+    "y": 980,
+    "wires": [
+      [
+        "fn_api_ack_alert_query"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_ack_alert_query",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API ack alert query",
+    "func": "const id = Number(msg.req.params.id);\nif (!Number.isFinite(id) || id < 1) {\n  msg.statusCode = 400;\n  msg.payload = { error: \"validation_error\", message: \"Invalid alert id\" };\n  return [msg, null];\n}\n\nmsg.alert_id = Math.trunc(id);\nmsg.topic = `\n  UPDATE alerts\n  SET ack_status = 'ACKED', acked_at = NOW(3)\n  WHERE id = ? AND ack_status = 'PENDING'\n`;\nmsg.payload = [msg.alert_id];\nreturn [null, msg];",
+    "outputs": 2,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 430,
+    "y": 980,
+    "wires": [
+      [
+        "fn_api_response_headers"
+      ],
+      [
+        "sql_api_ack_alert"
+      ]
+    ]
+  },
+  {
+    "id": "sql_api_ack_alert",
+    "type": "mysql",
+    "z": "flow_parcial2",
+    "mydb": "cfg_mysql",
+    "name": "API DB ack alert",
+    "x": 670,
+    "y": 980,
+    "wires": [
+      [
+        "fn_api_ack_alert_response"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_ack_alert_response",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API ack alert response",
+    "func": "const affectedRows = Number(msg.payload && msg.payload.affectedRows);\n\nif (affectedRows === 0) {\n  msg.statusCode = 404;\n  msg.payload = { error: \"alert_not_found_or_not_pending\" };\n  return msg;\n}\n\nmsg.payload = { ok: true, id: msg.alert_id, ack_status: \"ACKED\" };\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 930,
+    "y": 980,
+    "wires": [
+      [
+        "fn_api_response_headers"
+      ]
+    ]
+  },
+  {
+    "id": "http_api_delete_alert",
+    "type": "http in",
+    "z": "flow_parcial2",
+    "name": "DELETE /api/alerts/:id",
+    "url": "/api/alerts/:id",
+    "method": "delete",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 190,
+    "y": 1040,
+    "wires": [
+      [
+        "fn_api_delete_alert_query"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_delete_alert_query",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API delete alert query",
+    "func": "const id = Number(msg.req.params.id);\nif (!Number.isFinite(id) || id < 1) {\n  msg.statusCode = 400;\n  msg.payload = { error: \"validation_error\", message: \"Invalid alert id\" };\n  return [msg, null];\n}\n\nmsg.alert_id = Math.trunc(id);\nmsg.topic = `\n  UPDATE alerts\n  SET ack_status = 'CLOSED', acked_at = COALESCE(acked_at, NOW(3))\n  WHERE id = ?\n`;\nmsg.payload = [msg.alert_id];\nreturn [null, msg];",
+    "outputs": 2,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 430,
+    "y": 1040,
+    "wires": [
+      [
+        "fn_api_response_headers"
+      ],
+      [
+        "sql_api_delete_alert"
+      ]
+    ]
+  },
+  {
+    "id": "sql_api_delete_alert",
+    "type": "mysql",
+    "z": "flow_parcial2",
+    "mydb": "cfg_mysql",
+    "name": "API DB delete alert",
+    "x": 680,
+    "y": 1040,
+    "wires": [
+      [
+        "fn_api_delete_alert_response"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_delete_alert_response",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API delete alert response",
+    "func": "const affectedRows = Number(msg.payload && msg.payload.affectedRows);\n\nif (affectedRows === 0) {\n  msg.statusCode = 404;\n  msg.payload = { error: \"alert_not_found\" };\n  return msg;\n}\n\nmsg.payload = { ok: true, id: msg.alert_id, ack_status: \"CLOSED\" };\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 940,
+    "y": 1040,
+    "wires": [
+      [
+        "fn_api_response_headers"
+      ]
+    ]
+  },
+  {
+    "id": "http_api_summary",
+    "type": "http in",
+    "z": "flow_parcial2",
+    "name": "GET /api/analytics/summary",
+    "url": "/api/analytics/summary",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 210,
+    "y": 1100,
+    "wires": [
+      [
+        "fn_api_summary_query"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_summary_query",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API summary query",
+    "func": "const parsePositiveInt = (rawValue, fallback, max) => {\n  const parsed = Number(rawValue);\n  if (!Number.isFinite(parsed) || parsed <= 0) {\n    return fallback;\n  }\n\n  return Math.min(Math.trunc(parsed), max);\n};\n\nconst query = msg.req.query || {};\nconst hours = parsePositiveInt(query.hours, 24, 720);\nconst deviceId = String(query.device_id || \"\").trim();\nconst devicesWhere = deviceId ? \"WHERE device_id = ?\" : \"\";\nconst deviceFilter = deviceId ? \" AND device_id = ?\" : \"\";\nconst params = [];\n\nif (deviceId) {\n  params.push(deviceId);\n}\n\nfor (let index = 0; index < 9; index += 1) {\n  params.push(hours);\n  if (deviceId) {\n    params.push(deviceId);\n  }\n}\n\nmsg.api_hours = hours;\nmsg.topic = `\n  SELECT\n    (SELECT COUNT(*) FROM devices ${devicesWhere}) AS total_devices,\n    (SELECT COUNT(*) FROM devices WHERE last_seen_at >= DATE_SUB(NOW(3), INTERVAL ? HOUR)${deviceFilter}) AS active_devices,\n    (SELECT COUNT(*) FROM sensor_readings WHERE ingested_at >= DATE_SUB(NOW(3), INTERVAL ? HOUR)${deviceFilter}) AS total_readings,\n    (SELECT ROUND(COALESCE(AVG(co_ppm), 0), 2) FROM sensor_readings WHERE ingested_at >= DATE_SUB(NOW(3), INTERVAL ? HOUR)${deviceFilter}) AS avg_co_ppm,\n    (SELECT COALESCE(MAX(co_ppm), 0) FROM sensor_readings WHERE ingested_at >= DATE_SUB(NOW(3), INTERVAL ? HOUR)${deviceFilter}) AS max_co_ppm,\n    (SELECT COALESCE(MIN(co_ppm), 0) FROM sensor_readings WHERE ingested_at >= DATE_SUB(NOW(3), INTERVAL ? HOUR)${deviceFilter}) AS min_co_ppm,\n    (SELECT COUNT(*) FROM alerts WHERE alert_ts >= DATE_SUB(NOW(3), INTERVAL ? HOUR)${deviceFilter}) AS total_alerts,\n    (SELECT COUNT(*) FROM alerts WHERE alert_ts >= DATE_SUB(NOW(3), INTERVAL ? HOUR) AND severity = 'CRITICAL'${deviceFilter}) AS critical_alerts,\n    (SELECT COUNT(*) FROM alerts WHERE alert_ts >= DATE_SUB(NOW(3), INTERVAL ? HOUR) AND ack_status = 'PENDING'${deviceFilter}) AS pending_alerts,\n    (SELECT COUNT(*) FROM state_events WHERE ingested_at >= DATE_SUB(NOW(3), INTERVAL ? HOUR) AND urgente = 1${deviceFilter}) AS urgent_events\n`;\nmsg.payload = params;\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 450,
+    "y": 1100,
+    "wires": [
+      [
+        "sql_api_summary"
+      ]
+    ]
+  },
+  {
+    "id": "sql_api_summary",
+    "type": "mysql",
+    "z": "flow_parcial2",
+    "mydb": "cfg_mysql",
+    "name": "API DB summary",
+    "x": 680,
+    "y": 1100,
+    "wires": [
+      [
+        "fn_api_summary_response"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_summary_response",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API summary response",
+    "func": "const toNumber = (value) => {\n  const parsed = Number(value);\n  return Number.isFinite(parsed) ? parsed : 0;\n};\n\nconst row = Array.isArray(msg.payload) && msg.payload.length > 0 ? msg.payload[0] : {};\nmsg.payload = {\n  hours: msg.api_hours || 24,\n  devices: {\n    total: toNumber(row.total_devices),\n    active: toNumber(row.active_devices)\n  },\n  readings: {\n    total: toNumber(row.total_readings),\n    avg_co_ppm: toNumber(row.avg_co_ppm),\n    max_co_ppm: toNumber(row.max_co_ppm),\n    min_co_ppm: toNumber(row.min_co_ppm)\n  },\n  alerts: {\n    total: toNumber(row.total_alerts),\n    critical: toNumber(row.critical_alerts),\n    pending: toNumber(row.pending_alerts)\n  },\n  states: {\n    urgent_events: toNumber(row.urgent_events)\n  }\n};\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 930,
+    "y": 1100,
+    "wires": [
+      [
+        "fn_api_response_headers"
+      ]
+    ]
+  },
+  {
+    "id": "http_api_state_distribution",
+    "type": "http in",
+    "z": "flow_parcial2",
+    "name": "GET /api/analytics/state-distribution",
+    "url": "/api/analytics/state-distribution",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 260,
+    "y": 1160,
+    "wires": [
+      [
+        "fn_api_state_distribution_query"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_state_distribution_query",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API state distribution query",
+    "func": "const parsePositiveInt = (rawValue, fallback, max) => {\n  const parsed = Number(rawValue);\n  if (!Number.isFinite(parsed) || parsed <= 0) {\n    return fallback;\n  }\n\n  return Math.min(Math.trunc(parsed), max);\n};\n\nconst query = msg.req.query || {};\nconst hours = parsePositiveInt(query.hours, 24, 720);\nconst deviceId = String(query.device_id || \"\").trim();\nconst params = [hours];\nlet deviceFilter = \"\";\n\nif (deviceId) {\n  deviceFilter = \" AND device_id = ?\";\n  params.push(deviceId);\n}\n\nmsg.api_hours = hours;\nmsg.topic = `\n  SELECT estado, COUNT(*) AS total\n  FROM state_events\n  WHERE ingested_at >= DATE_SUB(NOW(3), INTERVAL ? HOUR)\n    ${deviceFilter}\n  GROUP BY estado\n  ORDER BY total DESC\n`;\nmsg.payload = params;\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 560,
+    "y": 1160,
+    "wires": [
+      [
+        "sql_api_state_distribution"
+      ]
+    ]
+  },
+  {
+    "id": "sql_api_state_distribution",
+    "type": "mysql",
+    "z": "flow_parcial2",
+    "mydb": "cfg_mysql",
+    "name": "API DB state distribution",
+    "x": 850,
+    "y": 1160,
+    "wires": [
+      [
+        "fn_api_state_distribution_response"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_state_distribution_response",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API state distribution response",
+    "func": "const rows = Array.isArray(msg.payload) ? msg.payload : [];\nmsg.payload = {\n  hours: msg.api_hours || 24,\n  data: rows.map((row) => ({\n    estado: row.estado,\n    total: Number(row.total) || 0\n  }))\n};\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1160,
+    "y": 1160,
+    "wires": [
+      [
+        "fn_api_response_headers"
+      ]
+    ]
+  },
+  {
+    "id": "http_api_timeseries",
+    "type": "http in",
+    "z": "flow_parcial2",
+    "name": "GET /api/analytics/timeseries",
+    "url": "/api/analytics/timeseries",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 220,
+    "y": 1220,
+    "wires": [
+      [
+        "fn_api_timeseries_query"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_timeseries_query",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API timeseries query",
+    "func": "const parsePositiveInt = (rawValue, fallback, max) => {\n  const parsed = Number(rawValue);\n  if (!Number.isFinite(parsed) || parsed <= 0) {\n    return fallback;\n  }\n\n  return Math.min(Math.trunc(parsed), max);\n};\n\nconst query = msg.req.query || {};\nconst hours = parsePositiveInt(query.hours, 24, 720);\nconst deviceId = String(query.device_id || \"\").trim();\nconst params = [hours];\nlet deviceFilter = \"\";\n\nif (deviceId) {\n  deviceFilter = \"AND device_id = ?\";\n  params.push(deviceId);\n}\n\nmsg.api_hours = hours;\nmsg.topic = `\n  SELECT DATE_FORMAT(ingested_at, '%Y-%m-%dT%H:%i:00') AS bucket,\n    device_id,\n    ROUND(AVG(co_ppm), 2) AS avg_co_ppm,\n    MAX(co_ppm) AS max_co_ppm,\n    ROUND(AVG(raw_co_adc), 0) AS avg_raw_co_adc,\n    SUM(presencia = 1) AS presencia_count,\n    COUNT(*) AS samples\n  FROM sensor_readings\n  WHERE ingested_at >= DATE_SUB(NOW(3), INTERVAL ? HOUR)\n    ${deviceFilter}\n  GROUP BY bucket, device_id\n  ORDER BY bucket ASC\n  LIMIT 500\n`;\nmsg.payload = params;\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 460,
+    "y": 1220,
+    "wires": [
+      [
+        "sql_api_timeseries"
+      ]
+    ]
+  },
+  {
+    "id": "sql_api_timeseries",
+    "type": "mysql",
+    "z": "flow_parcial2",
+    "mydb": "cfg_mysql",
+    "name": "API DB timeseries",
+    "x": 700,
+    "y": 1220,
+    "wires": [
+      [
+        "fn_api_timeseries_response"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_timeseries_response",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API timeseries response",
+    "func": "const toNumberOrNull = (value) => {\n  const parsed = Number(value);\n  return Number.isFinite(parsed) ? parsed : null;\n};\n\nconst rows = Array.isArray(msg.payload) ? msg.payload : [];\nmsg.payload = {\n  hours: msg.api_hours || 24,\n  data: rows.map((row) => ({\n    bucket: row.bucket,\n    device_id: row.device_id,\n    avg_co_ppm: toNumberOrNull(row.avg_co_ppm),\n    max_co_ppm: toNumberOrNull(row.max_co_ppm),\n    avg_raw_co_adc: toNumberOrNull(row.avg_raw_co_adc),\n    presencia_count: Number(row.presencia_count) || 0,\n    samples: Number(row.samples) || 0\n  }))\n};\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 960,
+    "y": 1220,
+    "wires": [
+      [
+        "fn_api_response_headers"
+      ]
+    ]
+  },
+  {
+    "id": "http_api_recent_commands",
+    "type": "http in",
+    "z": "flow_parcial2",
+    "name": "GET /api/commands/recent",
+    "url": "/api/commands/recent",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 210,
+    "y": 1280,
+    "wires": [
+      [
+        "fn_api_recent_commands_query"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_recent_commands_query",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API recent commands query",
+    "func": "const parsePositiveInt = (rawValue, fallback, max) => {\n  const parsed = Number(rawValue);\n  if (!Number.isFinite(parsed) || parsed <= 0) {\n    return fallback;\n  }\n\n  return Math.min(Math.trunc(parsed), max);\n};\n\nconst limit = parsePositiveInt((msg.req.query || {}).limit, 20, 200);\nmsg.topic = `\n  SELECT id, device_id, command_ts, actuator, action, reason, source_state,\n    co_ppm, presencia, status\n  FROM actuator_commands\n  ORDER BY id DESC\n  LIMIT ?\n`;\nmsg.payload = [limit];\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 470,
+    "y": 1280,
+    "wires": [
+      [
+        "sql_api_recent_commands"
+      ]
+    ]
+  },
+  {
+    "id": "sql_api_recent_commands",
+    "type": "mysql",
+    "z": "flow_parcial2",
+    "mydb": "cfg_mysql",
+    "name": "API DB recent commands",
+    "x": 730,
+    "y": 1280,
+    "wires": [
+      [
+        "fn_api_recent_commands_response"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_recent_commands_response",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API recent commands response",
+    "func": "const toNumberOrNull = (value) => {\n  const parsed = Number(value);\n  return Number.isFinite(parsed) ? parsed : null;\n};\n\nconst rows = Array.isArray(msg.payload) ? msg.payload : [];\nmsg.payload = {\n  data: rows.map((row) => ({\n    id: Number(row.id),\n    device_id: row.device_id,\n    command_ts: row.command_ts,\n    actuator: row.actuator,\n    action: row.action,\n    reason: row.reason,\n    source_state: row.source_state,\n    co_ppm: toNumberOrNull(row.co_ppm),\n    presencia: toNumberOrNull(row.presencia),\n    status: row.status\n  }))\n};\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1010,
+    "y": 1280,
+    "wires": [
+      [
+        "fn_api_response_headers"
+      ]
+    ]
+  },
+  {
+    "id": "http_api_post_ventilation",
+    "type": "http in",
+    "z": "flow_parcial2",
+    "name": "POST /api/commands/ventilation",
+    "url": "/api/commands/ventilation",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 230,
+    "y": 1340,
+    "wires": [
+      [
+        "fn_api_post_ventilation"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_post_ventilation",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API ventilation command",
+    "func": "const body = (typeof msg.payload === \"object\" && msg.payload !== null) ? msg.payload : {};\nconst action = String(body.action || \"\").trim().toUpperCase();\n\nif (action !== \"ENCENDER\" && action !== \"APAGAR\") {\n  msg.statusCode = 400;\n  msg.payload = { error: \"validation_error\", message: \"action must be ENCENDER or APAGAR\" };\n  return [msg, null, null];\n}\n\nconst topicBase = env.get(\"MQTT_TOPIC_BASE\") || \"your_maqiatto_username/fiot/garage\";\nconst commandTopic = env.get(\"MQTT_COMMAND_TOPIC\") || `${topicBase}/commands`;\nconst timestamp = new Date().toISOString();\nconst deviceId = String(body.device_id || env.get(\"HARDWARE_DEVICE_ID\") || \"ESP32-GARAGE-CO-001\").trim();\nconst reason = String(body.reason || \"Comando manual desde dashboard\").trim().slice(0, 255);\nconst command = {\n  device_id: deviceId,\n  timestamp,\n  actuator: \"VENTILACION\",\n  action,\n  reason,\n  source: \"node-red-api\"\n};\n\nconst sqlMsg = { ...msg };\nsqlMsg.commandPayload = command;\nsqlMsg.mqtt_topic = commandTopic;\nsqlMsg.topic = `\n  INSERT INTO actuator_commands\n    (device_id, device_timestamp, actuator, action, reason, source_state, status)\n  VALUES (?, ?, ?, ?, ?, ?, ?)\n`;\nsqlMsg.payload = [deviceId, timestamp, \"VENTILACION\", action, reason, \"MANUAL_API\", \"PUBLISHED\"];\n\nconst mqttMsg = { ...msg };\nmqttMsg.topic = commandTopic;\nmqttMsg.payload = command;\n\nreturn [null, sqlMsg, mqttMsg];",
+    "outputs": 3,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 510,
+    "y": 1340,
+    "wires": [
+      [
+        "fn_api_response_headers"
+      ],
+      [
+        "sql_api_post_ventilation"
+      ],
+      [
+        "mqtt_out_api_commands"
+      ]
+    ]
+  },
+  {
+    "id": "sql_api_post_ventilation",
+    "type": "mysql",
+    "z": "flow_parcial2",
+    "mydb": "cfg_mysql",
+    "name": "API DB command audit",
+    "x": 790,
+    "y": 1320,
+    "wires": [
+      [
+        "fn_api_post_ventilation_response"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_post_ventilation_response",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API ventilation response",
+    "func": "msg.payload = {\n  ok: true,\n  command: msg.commandPayload,\n  mqtt_topic: msg.mqtt_topic\n};\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1060,
+    "y": 1320,
+    "wires": [
+      [
+        "fn_api_response_headers"
+      ]
+    ]
+  },
+  {
+    "id": "mqtt_out_api_commands",
+    "type": "mqtt out",
+    "z": "flow_parcial2",
+    "name": "API MQTT Commands Out",
+    "topic": "",
+    "qos": "1",
+    "retain": "false",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "cfg_mqtt",
+    "x": 800,
+    "y": 1380,
+    "wires": []
+  },
+  {
+    "id": "http_api_options_ack_alert",
+    "type": "http in",
+    "z": "flow_parcial2",
+    "name": "OPTIONS /api/alerts/:id/ack",
+    "url": "/api/alerts/:id/ack",
+    "method": "options",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 210,
+    "y": 1420,
+    "wires": [
+      [
+        "fn_api_options_response"
+      ]
+    ]
+  },
+  {
+    "id": "http_api_options_delete_alert",
+    "type": "http in",
+    "z": "flow_parcial2",
+    "name": "OPTIONS /api/alerts/:id",
+    "url": "/api/alerts/:id",
+    "method": "options",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 200,
+    "y": 1460,
+    "wires": [
+      [
+        "fn_api_options_response"
+      ]
+    ]
+  },
+  {
+    "id": "http_api_options_ventilation",
+    "type": "http in",
+    "z": "flow_parcial2",
+    "name": "OPTIONS /api/commands/ventilation",
+    "url": "/api/commands/ventilation",
+    "method": "options",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 240,
+    "y": 1500,
+    "wires": [
+      [
+        "fn_api_options_response"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_options_response",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API options response",
+    "func": "msg.statusCode = 204;\nmsg.payload = \"\";\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 530,
+    "y": 1460,
+    "wires": [
+      [
+        "fn_api_response_headers"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_response_headers",
+    "type": "function",
+    "z": "flow_parcial2",
+    "name": "API response headers",
+    "func": "const origin = env.get(\"API_CORS_ORIGIN\") || \"http://localhost:5173\";\nmsg.headers = Object.assign({}, msg.headers || {}, {\n  \"Access-Control-Allow-Origin\": origin,\n  \"Access-Control-Allow-Methods\": \"GET, POST, PUT, DELETE, OPTIONS\",\n  \"Access-Control-Allow-Headers\": \"Content-Type\",\n  \"Access-Control-Max-Age\": \"86400\"\n});\n\nif (!msg.statusCode) {\n  msg.statusCode = 200;\n}\n\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1370,
+    "y": 1120,
+    "wires": [
+      [
+        "http_api_response"
+      ]
+    ]
+  },
+  {
+    "id": "http_api_response",
+    "type": "http response",
+    "z": "flow_parcial2",
+    "name": "API HTTP response",
+    "statusCode": "",
+    "headers": {},
+    "x": 1610,
+    "y": 1120,
+    "wires": []
+  },
+  {
     "id": "cfg_mqtt",
     "type": "mqtt-broker",
     "name": "Maqiatto Broker",

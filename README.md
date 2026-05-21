@@ -89,7 +89,6 @@ Nota de conversión MQ-7:
   - Orquestado con `podman-compose`
   - `fiot-nodered`
   - `fiot-mariadb`
-  - `fiot-api` (ElysiaJS REST API)
   - `fiot-dashboard` (ReactTS dashboard)
 - Broker MQTT externo: `maqiatto.com`
 - `nodered/flows.json` (procesamiento y simulación)
@@ -97,9 +96,9 @@ Nota de conversión MQ-7:
 
 Interfaces Parcial 3:
 
-- API REST: `http://localhost:3000/api/health`
+- API REST Node-RED: `http://localhost:1880/api/health`
 - Dashboard web: `http://localhost:5173` (ReactTS + Tailwind + Shadcn/UI + Sonner)
-- UI "Sleek Minimalist": Tema oscuro con notificaciones por severidad y SSE real-time.
+- UI "Sleek Minimalist": Tema oscuro con notificaciones por severidad y actualización periódica desde REST.
 - Evidencia: `docs/PARCIAL3.md`
 
 ## Firmware ESP32-S3 N16R8

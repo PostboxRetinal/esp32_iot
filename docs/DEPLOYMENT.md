@@ -16,8 +16,7 @@
 Desde la raíz del proyecto, iniciar stack:
 
 - MariaDB (persistencia)
-- Node-RED (ingesta/procesamiento/simulador)
-- ElysiaJS API (REST para apps externas)
+- Node-RED (ingesta/procesamiento/simulador/API REST)
 - Dashboard ReactTS (visualización web)
 - Broker MQTT externo: Maqiatto (`maqiatto.com`)
 
@@ -38,7 +37,7 @@ Detener y limpiar:
 Servicios expuestos:
 
 - Node-RED: `http://localhost:1880`
-- API ElysiaJS: `http://localhost:3000/api/health`
+- API REST Node-RED: `http://localhost:1880/api/health`
 - Dashboard ReactTS: `http://localhost:5173`
 
 ## 3) Importación automática del flujo (sin pasos manuales)
@@ -53,7 +52,7 @@ Servicios expuestos:
   - establecer `NR_FORCE_IMPORT=true` en `.env` y reiniciar Node-RED, o
   - eliminar el volumen `nodered_data` y volver a levantar el stack.
 
-> Importante: si ya tenías el volumen de MariaDB creado antes de esta versión, `schema.sql` no se vuelve a ejecutar automáticamente. Para incluir tablas nuevas (por ejemplo `actuator_commands`), aplica el script manualmente o recrea el volumen `mariadb_data`.
+> Importante: si ya tenías el volumen de MariaDB creado antes de esta versión, `schema.sql` no se vuelve a ejecutar automáticamente. Para incluir tablas o columnas nuevas (por ejemplo `actuator_commands` o `alerts.raw_co_adc`), aplica una migración manual o recrea el volumen `mariadb_data`.
 > Re-seeding: `auto-import-entrypoint.sh` compara el hash de `flows.template.json`. Si cambia, se aplica un re-seeding automático al reiniciar el contenedor de Node-RED.
 > Despliegue: Siempre usar `podman-compose down && podman-compose up --build -d` para asegurar que los cambios locales en el código/volúmenes se propaguen correctamente.
 

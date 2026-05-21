@@ -12,7 +12,7 @@ Este documento mapea los requerimientos de `Parcial3-FIoT-2026-01.pdf` con la im
 
 - Node-RED ingesta telemetría MQTT compartida, normaliza mensajes, recalcula estado, genera alertas y audita comandos.
 - MariaDB almacena dispositivos, lecturas, eventos de estado, alertas y comandos.
-- ElysiaJS expone la información por REST para aplicaciones externas.
+- Node-RED expone la información por REST para aplicaciones externas.
 - ReactTS consume la API y presenta un dashboard web.
 
 ## 3. Limpieza y análisis de datos
@@ -30,28 +30,26 @@ La limpieza se realiza en Node-RED, función `Normalize + derive state`:
   - Estado `PELIGRO`: Si `co_ppm` o `raw_adc` superan sus umbrales de PRECAUCION.
   - Estado `CRITICO`: Si `co_ppm` o `raw_adc` superan sus umbrales de PELIGRO.
   - Urgencia (`_URGENTE`): Si hay presencia Y (`co_ppm` > URGENTE_PPM O `raw_adc` > URGENTE_RAW).
--descarta mensajes inválidos antes de persistir.
+- descarta mensajes inválidos antes de persistir.
 
-El análisis se expone desde ElysiaJS:
+El análisis se expone desde Node-RED:
 
 - `GET /api/analytics/summary?hours=24`: promedio, máximo, mínimo, alertas, nodos activos y urgencias.
 - `GET /api/analytics/state-distribution?hours=24`: distribución de estados.
 - `GET /api/analytics/timeseries?device_id=&hours=24`: serie temporal de CO por minuto y nodo (incluye `avg_raw_co_adc`).
-- `GET /api/alerts/stream`: canal SSE para alertas MQTT en tiempo real.
 
-Valor para el problema: permite identificar periodos de mayor concentración de CO, validar si hay presencia durante estados críticos y priorizar acciones de ventilación o evacuación. La incorporación de `raw_co_adc` permite verificar eltrigger por cualquiera de los dos sensores.
+Valor para el problema: permite identificar periodos de mayor concentración de CO, validar si hay presencia durante estados críticos y priorizar acciones de ventilación o evacuación. La incorporación de `raw_co_adc` permite verificar el trigger por cualquiera de los dos sensores.
 
 ## 4. Interfaces REST
 
-La API REST está implementada con ElysiaJS en `apps/api`.
+La API REST está implementada 100% en Node-RED dentro de `nodered/flows.json`, usando nodos `http in`, `function`, `mysql`, `mqtt out` y `http response`.
 
 | Método | Ruta | Propósito |
 | --- | --- | --- |
 | GET | `/api/health` | Estado de API, DB y configuración MQTT |
 | GET | `/api/devices` | Lista nodos y último estado conocido |
 | GET | `/api/readings/latest?device_id=&limit=` | Últimas lecturas de sensores |
-| GET | `/api/alerts/recent?hours=&limit=` | Alertas recientes |
-| GET | `/api/alerts/stream` | Alertas en tiempo real (SSE) |
+| GET | `/api/alerts/recent?device_id=&hours=&limit=` | Alertas recientes |
 | PUT | `/api/alerts/:id/ack` | Confirmar alerta pendiente |
 | DELETE | `/api/alerts/:id` | Cierre lógico de alerta |
 | GET | `/api/analytics/summary?hours=24` | Resumen analítico |
@@ -60,10 +58,12 @@ La API REST está implementada con ElysiaJS en `apps/api`.
 | GET | `/api/commands/recent?limit=` | Auditoría reciente de comandos |
 | POST | `/api/commands/ventilation` | Publicar comando MQTT de ventilación |
 
+Las operaciones se pueden probar en Postman usando `http://localhost:1880` como base URL. Los ejemplos `curl` equivalen a las mismas solicitudes REST.
+
 Ejemplo de comando:
 
 ```sh
-curl -X POST http://localhost:3000/api/commands/ventilation \
+curl -X POST http://localhost:1880/api/commands/ventilation \
   -H 'Content-Type: application/json' \
   -d '{"action":"ENCENDER","reason":"Prueba desde API"}'
 ```
@@ -73,18 +73,18 @@ curl -X POST http://localhost:3000/api/commands/ventilation \
 El dashboard principal se implementa con Bun + ReactTS en `apps/dashboard`.
 
 - URL local: `http://localhost:5173`
-- Consume exclusivamente la API REST de ElysiaJS.
-- **Alertas en tiempo real**: Suscripción vía SSE (`/api/alerts/stream`), categorizadas por severidad (`INFO`, `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) y mostradas mediante `sonner` con estilos CSS minimalistas. Las alertas incluyen el valor `raw_co_adc` en la descripción.
+- Consume exclusivamente la API REST de Node-RED.
+- **Alertas**: Consulta periódica de `/api/alerts/recent`, categorizadas por severidad (`INFO`, `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) y mostradas mediante `sonner` con estilos CSS minimalistas. Las alertas incluyen el valor `raw_co_adc` en la descripción.
 - **Estado de nodos**: Cálculo en tiempo real (`online` si `last_seen_at` >= `NOW()` - 90s, caso contrario `offline`). Cada nodo muestra tanto `co_ppm` como `raw_co_adc`.
 - **Métricas**: La tarjeta principal muestra `co_ppm` y `raw_co_adc`. El gráfico de series temporales usa doble eje Y (ppm en cyan, raw ADC en ámbar).
 - **UI**: Diseño "Sleek Minimalist" con Tailwind y Shadcn/UI.
 - Enlaza Node-RED en `http://localhost:1880` como plataforma IoT de procesamiento.
 
-Se decidió no usar Node-RED Dashboard. Node-RED queda como plataforma IoT y la visualización se realiza en una aplicación web React, aceptando la desviación frente al literal del PDF.
+Se decidió no usar Node-RED Dashboard. Node-RED queda como plataforma IoT, motor REST y backend de procesamiento; la visualización se realiza en una aplicación web React.
 
 ## 6. Aplicación web
 
-La aplicación web es el dashboard ReactTS. Consume los endpoints REST con `fetch` desde `apps/dashboard/src/api.ts` y permite interacción con alertas y comandos.
+La aplicación web es el dashboard ReactTS. Consume los endpoints REST de Node-RED con `fetch` desde `apps/dashboard/src/api.ts` y permite interacción con alertas y comandos.
 
 ## Ejecución
 
@@ -96,5 +96,5 @@ podman-compose --env-file .env -f podman-compose.yml up --build
 Servicios esperados:
 
 - Node-RED: `http://localhost:1880`
-- API ElysiaJS: `http://localhost:3000/api/health`
+- API REST Node-RED: `http://localhost:1880/api/health`
 - Dashboard React: `http://localhost:5173`

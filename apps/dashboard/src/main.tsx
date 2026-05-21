@@ -37,7 +37,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import "./styles.css";
 
 type DashboardData = {
-  health: { ok: boolean; db: string; mqtt: string; timestamp: string } | null;
+  health: { ok: boolean; db: string; mqtt: string; command_topic?: string; timestamp: string } | null;
   devices: Device[];
   readings: Reading[];
   alerts: Alert[];
@@ -337,21 +337,12 @@ function App() {
     void refresh();
 
     const interval = window.setInterval(() => void refresh(), 10000);
-    const source = api.openAlertStream((alert) => {
-      if (selectedDeviceId && alert.device_id !== selectedDeviceId) {
-        return;
-      }
-
-      handleAlert(alert);
-      void refresh();
-    });
 
     return () => {
       active = false;
       window.clearInterval(interval);
-      source.close();
     };
-  }, [selectedDeviceId]);
+  }, [selectedDeviceId, reloadTick]);
 
   async function sendVentilation(action: "ENCENDER" | "APAGAR") {
     setCommandBusy(true);
@@ -431,7 +422,7 @@ function App() {
         <div>
           <p className="eyebrow">Dashboard de monitoreo remoto para niveles de Monóxido de Carbono en garajes</p>
           <h1>¡Bienvenido!</h1>
-          <p className="subtitle">Desarrollado en viteJS + shadCN, consumiendo REST API ElysiaJS sobre MariaDB, con Node-RED como backend, 100% compose ;)</p>
+          <p className="subtitle">Desarrollado en ViteJS + shadCN, consumiendo la API REST de Node-RED sobre MariaDB, 100% compose ;)</p>
         </div>
         <Card className="status-card">
           <DropdownMenu>

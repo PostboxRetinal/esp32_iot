@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:1880";
 
 export type Device = {
   device_id: string;
@@ -36,25 +36,6 @@ export type Alert = {
   ack_status: "PENDING" | "ACKED" | "CLOSED";
 };
 
-export type AlertStreamEvent = {
-  id?: number;
-  device_id: string;
-  device_timestamp: string;
-  alert_ts?: string;
-  severity: Alert["severity"];
-  estado: string;
-  message: string;
-  co_ppm: number;
-  raw_co_adc: number | null;
-  presencia: 0 | 1;
-  urgente: 0 | 1;
-  ack_status?: Alert["ack_status"];
-  acked_at?: string | null;
-  topic?: string;
-  source?: "mqtt" | "database";
-  received_at: string;
-};
-
 export type Summary = {
   hours: number;
   devices: { total: number; active: number };
@@ -90,12 +71,14 @@ export type Command = {
 };
 
 async function request<T>(path: string, init?: RequestInit) {
+  const headers = new Headers(init?.headers);
+  if (init?.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...init?.headers
-    }
+    headers
   });
 
   if (!response.ok) {
@@ -123,7 +106,7 @@ function withQuery(path: string, params: Record<string, string | number | undefi
 
 export const api = {
   baseUrl: API_BASE_URL,
-  health: () => request<{ ok: boolean; db: string; mqtt: string; timestamp: string }>("/api/health"),
+  health: () => request<{ ok: boolean; db: string; mqtt: string; command_topic?: string; timestamp: string }>("/api/health"),
   devices: () => request<{ data: Device[] }>("/api/devices"),
   latestReadings: (limit = 30, deviceId?: string) => request<{ data: Reading[] }>(withQuery("/api/readings/latest", { limit, device_id: deviceId })),
   recentAlerts: (hours = 24, limit = 20, deviceId?: string) => request<{ data: Alert[] }>(withQuery("/api/alerts/recent", { hours, limit, device_id: deviceId })),
@@ -133,27 +116,6 @@ export const api = {
   recentCommands: () => request<{ data: Command[] }>("/api/commands/recent?limit=10"),
   ackAlert: (id: number) => request(`/api/alerts/${id}/ack`, { method: "PUT" }),
   closeAlert: (id: number) => request(`/api/alerts/${id}`, { method: "DELETE" }),
-  openAlertStream: (onAlert: (alert: AlertStreamEvent) => void) => {
-    const source = new EventSource(`${API_BASE_URL}/api/alerts/stream`);
-
-    source.addEventListener("open", () => {
-      console.info("[api] alert stream connected");
-    });
-
-    source.addEventListener("alert", (event) => {
-      try {
-        onAlert(JSON.parse((event as MessageEvent<string>).data) as AlertStreamEvent);
-      } catch (error) {
-        console.error("[api] failed to parse alert stream payload", error);
-      }
-    });
-
-    source.addEventListener("error", () => {
-      console.warn("[api] alert stream disconnected, browser will retry");
-    });
-
-    return source;
-  },
   ventilation: (action: "ENCENDER" | "APAGAR") => request("/api/commands/ventilation", {
     method: "POST",
     body: JSON.stringify({ action, reason: "Comando manual desde dashboard React" })
