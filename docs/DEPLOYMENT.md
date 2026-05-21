@@ -1,4 +1,4 @@
-# Despliegue local (Podman)
+# Despliegue local con Podman Compose
 
 ## 1) Preparar variables de entorno
 
@@ -13,7 +13,7 @@
 
 ## 2) Levantar servicios
 
-Desde la raíz del proyecto, iniciar stack:
+Desde la raíz del proyecto, iniciar el stack:
 
 - MariaDB (persistencia)
 - Node-RED (ingesta/procesamiento/simulador/API REST)
@@ -53,8 +53,8 @@ Servicios expuestos:
   - eliminar el volumen `nodered_data` y volver a levantar el stack.
 
 > Importante: si ya tenías el volumen de MariaDB creado antes de esta versión, `schema.sql` no se vuelve a ejecutar automáticamente. Para incluir tablas o columnas nuevas (por ejemplo `actuator_commands` o `alerts.raw_co_adc`), aplica una migración manual o recrea el volumen `mariadb_data`.
-> Re-seeding: `auto-import-entrypoint.sh` compara el hash de `flows.template.json`. Si cambia, se aplica un re-seeding automático al reiniciar el contenedor de Node-RED.
-> Despliegue: Siempre usar `podman-compose down && podman-compose up --build -d` para asegurar que los cambios locales en el código/volúmenes se propaguen correctamente.
+> Reimportación: `auto-import-entrypoint.sh` compara el hash de `flows.template.json`. Si cambia, se aplica una reimportación automática al reiniciar el contenedor de Node-RED.
+> Despliegue: usa `podman-compose down && podman-compose up --build -d` para asegurar que los cambios locales en el código y los volúmenes se propaguen correctamente.
 
 ## 4) Configurar firmware ESP32
 
@@ -69,11 +69,11 @@ Editar `include/app_config.h`:
 
 > Recomendación: mantener consistentes los datos del firmware (`app_config.h`) con los valores MQTT del backend (`.env`).
 
-Luego compilar/subir con PlatformIO y abrir monitor serie.
+Luego compilar y subir con PlatformIO, y abrir el monitor serie.
 
 ## 5) Verificación rápida
 
-- Ver mensajes JSON de telemetría en monitor serie.
+- Ver mensajes JSON de telemetría en el monitor serie.
 - En Node-RED, validar que llegan mensajes de:
   - `ESP32-GARAGE-CO-001` (hardware)
   - `SIM-GARAGE-CO-001` (simulado)
@@ -83,7 +83,7 @@ Luego compilar/subir con PlatformIO y abrir monitor serie.
   - `alerts` (solo cuando CO >= 22)
   - `actuator_commands` (cuando se emiten comandos)
 
-También puedes ejecutar los inject de consulta histórica en Node-RED para obtener resúmenes rápidos de `sensor_readings`, `state_events`, `alerts` y `actuator_commands`.
+También puedes ejecutar los `inject` de consulta histórica en Node-RED para obtener resúmenes rápidos de `sensor_readings`, `state_events`, `alerts` y `actuator_commands`.
 
 ## 6) Consideraciones de seguridad mínima
 

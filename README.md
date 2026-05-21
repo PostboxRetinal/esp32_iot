@@ -1,66 +1,71 @@
-# Parcial2 - Arquitectura IoT Garage CO
+# Parcial 3 - Arquitectura IoT Garage CO
 
 ## Resumen
 
-Este proyecto implementa una solución IoT híbrida con dos nodos de telemetría:
+Esta solución integra un nodo físico ESP32-S3, un nodo simulado en Node-RED, una base de datos MariaDB, una API REST servida por Node-RED y una aplicación web React para visualización y operación.
 
-- **Nodo hardware ESP32-S3 N16R8**: `ESP32-GARAGE-CO-001`
-- **Nodo simulado (Node-RED)**: `SIM-GARAGE-CO-001`
+## Objetivo
 
-Ambos publican telemetría de CO/PIR vía MQTT usando Maqiatto como broker externo. Node-RED centraliza procesamiento, clasificación de estados/alertas y persistencia en MySQL/MariaDB.
+Realizar limpieza y análisis de datos IoT, exponerlos mediante interfaces REST e integrarlos con una aplicación externa para visualización de información.
+
+## Arquitectura
+
+- Nodo hardware: `ESP32-GARAGE-CO-001`
+- Nodo simulado: `SIM-GARAGE-CO-001`
+- Backend IoT y API REST: Node-RED
+- Persistencia: MariaDB
+- Visualización: ReactTS
+- Broker MQTT externo: Maqiatto
+
+## Flujo de datos
+
+1. El ESP32 lee MQ-7 y PIR cada 5 segundos.
+2. Node-RED genera telemetría simulada para el segundo nodo.
+3. Ambos nodos publican en `fiot/garage/telemetry`.
+4. Node-RED valida, normaliza y clasifica la telemetría, guarda lecturas y genera alertas o comandos.
+5. La API REST de Node-RED expone consultas para el dashboard y para clientes externos.
+6. La aplicación web muestra estado, tendencias, alertas y auditoría de comandos.
 
 ## Protocolos y decisiones técnicas
 
-### 1) Conectividad de red
+### Conectividad de red
 
-- **Capa física/enlace**: Wi-Fi 802.11 b/g/n (modo estación en ESP32)
+- **Capa física/enlace**: Wi-Fi 802.11 b/g/n en modo estación
 - **Capa de red/transporte**: IPv4 + TCP
-- **Sincronización temporal**: NTP (`pool.ntp.org`, `time.nist.gov`) para timestamp ISO-8601
+- **Sincronización temporal**: NTP (`pool.ntp.org`, `time.nist.gov`) para timestamps ISO-8601
 
-### 2) Mensajería IoT
+### Mensajería IoT
 
-- **Protocolo**: MQTT 3.1.1 (broker externo Maqiatto)
-- **Patrón**: Publicador/Suscriptor (desacopla adquisición, procesamiento y almacenamiento)
+- **Protocolo**: MQTT 3.1.1
+- **Patrón**: Publicador/Suscriptor
 - **Formato de datos**: JSON
 - **Control de disponibilidad**:
   - Last Will (`status=offline`)
   - Heartbeat periódico (`.../heartbeat`)
 
-### 3) Persistencia
+### Persistencia
 
 - **Base de datos**: MySQL/MariaDB
-- **Persistencia separada por dominio**:
+- **Tablas principales**:
   - `sensor_readings`: mediciones
   - `state_events`: estados derivados
   - `alerts`: eventos accionables
   - `actuator_commands`: auditoría de comandos MQTT generados por reglas
   - `devices`: registro de nodos
 
-## Flujo de datos
-
-1. ESP32 lee MQ-7 y PIR cada 5 segundos.
-2. Firmware clasifica estado (`SEGURO`, `PRECAUCION`, `PELIGRO`, `CRITICO`) y aplica urgencia cuando hay presencia con CO crítico (`CRITICO_URGENTE`).
-3. ESP32 publica JSON en `fiot/garage/telemetry`.
-4. Node-RED consume `fiot/garage/telemetry`, valida payload, recalcula estado/urgencia (validación server-side) con umbrales tomados desde `include/app_config.h` y enruta por `device_id`.
-5. Node-RED inserta en MySQL tablas de lecturas, estados, alertas y auditoría de comandos.
-6. Cuando aplica alerta, Node-RED publica evento en `fiot/garage/alerts`.
-7. Cuando las reglas lo requieren, Node-RED publica comandos en `MQTT_COMMAND_TOPIC` (por defecto `<maqiatto_user>/fiot/garage/commands`) y guarda cada comando en `actuator_commands`.
-
-Además, el flujo incluye nodos de consulta histórica (SELECT manuales) para inspeccionar lecturas, estados, alertas y auditoría de comandos desde Node-RED.
-
-## Lógica de negocio (estado y alertas)
+## Lógica de negocio
 
 Umbrales de CO (PPM):
 
-- `< CO_SEGURO_MAX_PPM`  -> `SEGURO`
+- `< CO_SEGURO_MAX_PPM` -> `SEGURO`
 - `CO_SEGURO_MAX_PPM .. < CO_PRECAUCION_MAX_PPM` -> `PRECAUCION`
 - `CO_PRECAUCION_MAX_PPM .. < CO_PELIGRO_MAX_PPM` -> `PELIGRO`
 - `>= CO_PELIGRO_MAX_PPM` -> `CRITICO`
 
-Fuente única de estos umbrales:
+Fuente única de los umbrales:
 
 - Firmware: `include/app_config.h`
-- Node-RED: al importar el flujo, `nodered/seed-data.js` lee `app_config.h` y reemplaza tokens del template para mantener consistencia.
+- Node-RED: `nodered/seed-data.js` lee `app_config.h` y reemplaza los tokens del flujo para mantener consistencia.
 
 Regla de urgencia:
 
@@ -68,38 +73,37 @@ Regla de urgencia:
 
 Regla de alerta:
 
-- Generar alerta cuando `co_ppm >= CO_PELIGRO_MAX_PPM`
+- Se genera alerta cuando `co_ppm >= CO_PELIGRO_MAX_PPM`
 - Severidad `CRITICAL` si además `presencia == SI`, de lo contrario `HIGH`
 
 Nota de conversión MQ-7:
 
-- Si `raw_co_adc` llega a zona de saturación ADC (`>= 4090`), el firmware marca condición no confiable y aplica un fallback controlado de ppm para demo (`25.0`) manteniendo estado crítico.
+- Si `raw_co_adc` llega a zona de saturación ADC (`>= 4090`), el firmware marca la condición como no confiable y aplica un valor controlado de demostración (`25.0`) manteniendo estado crítico.
 
-## Seguridad y confiabilidad aplicadas
+## Seguridad y confiabilidad
 
-- Broker externo Maqiatto con autenticación por usuario/clave
-- Tópicos bajo prefijo de usuario Maqiatto (`<maqiatto_user>/...`)
+- Broker externo Maqiatto con autenticación por usuario y clave
+- Tópicos bajo el prefijo de usuario Maqiatto (`<maqiatto_user>/...`)
 - Reintentos automáticos Wi-Fi/MQTT en firmware
 - Heartbeat y LWT para visibilidad de disponibilidad
-- Persistencia de eventos en MySQL/MariaDB
+- Persistencia de eventos en MariaDB
 
 ## Componentes de despliegue
 
 - `podman-compose.yml`
-  - Orquestado con `podman-compose`
+  - Orquestación con `podman-compose`
   - `fiot-nodered`
   - `fiot-mariadb`
-  - `fiot-dashboard` (ReactTS dashboard)
-- Broker MQTT externo: `maqiatto.com`
-- `nodered/flows.json` (procesamiento y simulación)
-- `database/schema.sql` (modelo relacional)
+  - `fiot-dashboard`
+- `nodered/flows.json`: procesamiento, simulación, persistencia y API REST
+- `database/schema.sql`: modelo relacional
+- `docs/PARCIAL3.md`: evidencia de implementación
 
-Interfaces Parcial 3:
+## Interfaces Parcial 3
 
 - API REST Node-RED: `http://localhost:1880/api/health`
 - Dashboard web: `http://localhost:5173` (ReactTS + Tailwind + Shadcn/UI + Sonner)
-- UI "Sleek Minimalist": Tema oscuro con notificaciones por severidad y actualización periódica desde REST.
-- Evidencia: `docs/PARCIAL3.md`
+- UI "Sleek Minimalist": tema oscuro con notificaciones por severidad y actualización periódica desde REST
 
 ## Firmware ESP32-S3 N16R8
 
@@ -111,7 +115,7 @@ Interfaces Parcial 3:
 
 Conexiones usadas por el firmware:
 
-- MQ-7 `AOUT` -> GPIO4 (ADC, max 3.3 V; usar divisor si el modulo entrega 5 V)
+- MQ-7 `AOUT` -> GPIO4 (ADC, máximo 3.3 V; usar divisor si el módulo entrega 5 V)
 - PIR `OUT` -> GPIO5
 - LED de estado -> RGB integrado de la placa
 
@@ -123,4 +127,4 @@ Compilar:
 pio run -e esp32-s3-n16r8-uart
 ```
 
-Usar `esp32-s3-n16r8-uart` cuando la placa aparece como USB serial bridge, por ejemplo `USB VID:PID=1A86:55D3` / `USB Single Serial`. Usar `esp32-s3-n16r8-usbcdc` solo si se conecta al USB nativo del ESP32-S3.
+Usar `esp32-s3-n16r8-uart` cuando la placa aparece como puente USB a serie, por ejemplo `USB VID:PID=1A86:55D3` / `USB Single Serial`. Usar `esp32-s3-n16r8-usbcdc` solo si se conecta al USB nativo del ESP32-S3.

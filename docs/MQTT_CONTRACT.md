@@ -1,4 +1,4 @@
-# Contrato MQTT
+# Contrato MQTT del sistema
 
 ## Raíz de tópicos
 
@@ -21,7 +21,7 @@
   - Suscriptor: dashboard/notificaciones
   - `device_id` distingue el nodo dentro del payload
 
-## Payload de alerta (requerido)
+## Payload de alerta esperado
 
 ```json
 {
@@ -37,7 +37,7 @@
 }
 ```
 
-## Payload de telemetría (requerido)
+## Payload de telemetría esperado
 
 ```json
 {
@@ -58,7 +58,7 @@ Campos aceptados adicionales:
 ## Reglas de validación
 
 - `device_id`: string no vacío
-- `timestamp`: string ISO-8601 (si falta, Node-RED usa hora del servidor)
+- `timestamp`: string ISO-8601 (si falta, Node-RED usa la hora del servidor)
 - `co_ppm`: numérico
 - `presencia`: `SI`/`NO` (o equivalentes booleanos)
 - `estado`: clasificación del evento (`SEGURO`, `PRECAUCION`, `PELIGRO`, `CRITICO`, `CRITICO_URGENTE`)
@@ -70,7 +70,7 @@ Campos aceptados adicionales:
 - `status`: QoS 1, retain true
 - `alerts`: QoS 1, retain false
 
-> Nota: el firmware actual con `PubSubClient` publica con QoS 0. En este diseño, la confiabilidad se refuerza con reconexión automática, heartbeat y persistencia broker-side.
+> Nota: el firmware actual con `PubSubClient` publica con QoS 0. En este diseño, la confiabilidad se refuerza con reconexión automática, heartbeat y persistencia del lado del broker.
 
 ## Identificadores de nodo esperados
 
@@ -79,7 +79,7 @@ Campos aceptados adicionales:
 
 Node-RED distingue la fuente exclusivamente por `device_id`.
 
-## Regla Maqiatto para tópicos
+## Regla de Maqiatto para tópicos
 
 - Maqiatto requiere usar tópicos bajo tu prefijo de usuario.
 - En este proyecto, ese prefijo se define con `MQTT_TOPIC_BASE`.

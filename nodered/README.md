@@ -1,17 +1,17 @@
-# Node-RED assets
+# Recursos de Node-RED
 
-- `flows.json`: ingestion, processing, simulation, persistence, and REST API flow.
-- `package.json`: extra Node-RED nodes required by this flow (`node-red-node-mysql`).
-- `Dockerfile`: custom Node-RED image that installs dependencies from `package.json`.
-- `seed-data.js` + `auto-import-entrypoint.sh`: first-boot seeding of `flows.json` and `flows_cred.json` into `/data`.
+- `flows.json`: flujo de ingesta, procesamiento, simulación, persistencia y API REST.
+- `package.json`: nodos extra de Node-RED requeridos por este flujo (`node-red-node-mysql`).
+- `Dockerfile`: imagen personalizada de Node-RED que instala las dependencias de `package.json`.
+- `seed-data.js` + `auto-import-entrypoint.sh`: carga inicial de `flows.json` y `flows_cred.json` en `/data`.
 
-When running with Podman Compose (`podman-compose`), this project follows the official Node-RED Docker approach:
+Cuando se ejecuta con Podman Compose (`podman-compose`), el proyecto sigue el enfoque oficial de la imagen Docker de Node-RED:
 
-- Node-RED runtime data lives in a named volume mounted at `/data`.
-- Extra nodes are installed at image build time from `package.json`.
-- On first boot, the container auto-imports flow + credentials into `/data` from project templates and env vars.
-- Reseed control is available through `NR_AUTO_IMPORT` and `NR_FORCE_IMPORT` env vars.
+- Los datos de ejecución de Node-RED viven en un volumen nombrado montado en `/data`.
+- Los nodos extra se instalan durante la construcción de la imagen desde `package.json`.
+- En el primer arranque, el contenedor importa automáticamente el flujo y las credenciales en `/data` desde las plantillas del proyecto y las variables de entorno.
+- El control de reimportación está disponible mediante las variables `NR_AUTO_IMPORT` y `NR_FORCE_IMPORT`.
 
-MQTT, MariaDB, CORS, and node identifier values are provided by the root `.env` file and target Maqiatto/MariaDB.
+Los valores de MQTT, MariaDB, CORS e identificadores de nodos se obtienen del archivo raíz `.env` y apuntan a Maqiatto/MariaDB.
 
-The REST API is served directly by Node-RED on `http://localhost:1880/api/*`.
+La API REST se sirve directamente desde Node-RED en `http://localhost:1880/api/*`.
