@@ -33,7 +33,6 @@
     device_id VARCHAR(64) NOT NULL,
     device_timestamp VARCHAR(40) NOT NULL,
     estado VARCHAR(24) NOT NULL,
-    urgente TINYINT(1) NOT NULL,
     co_ppm DECIMAL(6,2) NOT NULL,
     presencia TINYINT(1) NOT NULL,
     reason VARCHAR(255) DEFAULT NULL,
@@ -43,8 +42,7 @@
       ON UPDATE CASCADE
       ON DELETE RESTRICT,
     INDEX idx_state_device_ingested (device_id, ingested_at),
-    INDEX idx_state_estado (estado),
-    INDEX idx_state_urgente (urgente)
+    INDEX idx_state_estado (estado)
   ) ENGINE=InnoDB;
 
   CREATE TABLE IF NOT EXISTS alerts (
