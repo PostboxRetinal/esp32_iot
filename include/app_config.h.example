@@ -1,0 +1,39 @@
+#pragma once
+
+// Shared firmware/backend configuration generated from .env at build time
+#include "app_shared_config.generated.h"
+
+// -------- Wi-Fi --------
+#define WIFI_SSID "<WIFI_SSID>"
+#define WIFI_PASSWORD "<WIFI_PASSWORD>"
+
+// -------- NTP / Timezone --------
+#define NTP_SERVER_1 "pool.ntp.org"
+#define NTP_SERVER_2 "time.nist.gov"
+#define TZ_OFFSET_SECONDS (-5 * 3600)   // Example: America/Bogota (UTC-5)
+#define TZ_DAYLIGHT_OFFSET 0
+
+// -------- Timing (ms) --------
+#define TELEMETRY_PUBLISH_INTERVAL_MS 5000UL
+#define HEARTBEAT_INTERVAL_MS 60000UL
+#define WIFI_RETRY_INTERVAL_MS 10000UL
+#define MQTT_RETRY_INTERVAL_MS 5000UL
+#define WIFI_CONNECT_TIMEOUT_MS 20000UL
+#define MQ7_WARMUP_MS 5000UL
+
+// -------- MQ-7 calibration constants --------
+#define RO 10.0f
+#define MQ7_CURVE_A 99.042f
+#define MQ7_CURVE_B -1.518f
+#define MQ7_SENSOR_VCC_VOLTAGE 5.0f
+#define MQ7_LOAD_RESISTOR_KOHM 10.0f
+
+// Debug-friendly saturation handling (depends on generated macros)
+#define MQ7_SATURATED_FALLBACK_PPM (CO_URGENTE_MIN_PPM + 3.0f)
+
+// Startup LED validation sequence duration per color
+#define LED_SELF_TEST_MS 500UL
+
+// GPIO mapping (board-specific, not shared)
+#define MQ7_PIN    4
+#define PIR_PIN    5

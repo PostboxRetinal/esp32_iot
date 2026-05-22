@@ -55,30 +55,31 @@ Realizar limpieza y análisis de datos IoT, exponerlos mediante interfaces REST 
 
 ## Lógica de negocio
 
-Umbrales de CO (PPM):
+Umbrales de CO (PPM) y raw ADC:
 
-- `< CO_SEGURO_MAX_PPM` -> `SEGURO`
-- `CO_SEGURO_MAX_PPM .. < CO_PRECAUCION_MAX_PPM` -> `PRECAUCION`
-- `CO_PRECAUCION_MAX_PPM .. < CO_PELIGRO_MAX_PPM` -> `PELIGRO`
-- `>= CO_PELIGRO_MAX_PPM` -> `CRITICO`
+- `< CO_SEGURO_MAX_PPM` y `< MQ7_ADC_SEGURO_RAW_MAX` -> `SEGURO`
+- `< CO_PRECAUCION_MAX_PPM` y `< MQ7_ADC_PRECAUCION_RAW_MAX` -> `PRECAUCION`
+- `< CO_PELIGRO_MAX_PPM` y `< MQ7_ADC_PELIGRO_RAW_MAX` -> `PELIGRO`
+- `>=` cualquiera de los anteriores -> `CRITICO`
 
-Fuente única de los umbrales:
+Regla de urgencia (doble disparador OR):
 
-- Firmware: `include/app_config.h`
-- Node-RED: `nodered/seed-data.js` lee `app_config.h` y reemplaza los tokens del flujo para mantener consistencia.
-
-Regla de urgencia:
-
-- Si `presencia == SI` y `co_ppm > CO_URGENTE_MIN_PPM` -> estado `CRITICO_URGENTE`
+- Si `presencia == SI` y (`co_ppm > CO_URGENTE_MIN_PPM` o `raw_co_adc > MQ7_ADC_URGENTE_RAW_MIN`) -> sufijo `_URGENTE`
 
 Regla de alerta:
 
 - Se genera alerta cuando `co_ppm >= CO_PELIGRO_MAX_PPM`
 - Severidad `CRITICAL` si además `presencia == SI`, de lo contrario `HIGH`
 
+Fuente única de los umbrales compartidos (MQTT + DEVICE_ID + CO + ADC):
+
+- Archivo `.env` en la raíz del proyecto
+- Firmware: `scripts/generate_firmware_shared_config.py` genera `include/app_shared_config.generated.h` desde `.env` durante la compilación
+- Node-RED: `seed-data.js` reemplaza tokens `${...}` en `flows.json` con valores de `process.env` heredados de `.env`
+
 Nota de conversión MQ-7:
 
-- Si `raw_co_adc` llega a zona de saturación ADC (`>= 4090`), el firmware marca la condición como no confiable y aplica un valor controlado de demostración (`25.0`) manteniendo estado crítico.
+- Si `raw_co_adc` llega a zona de saturación ADC (`>= 4090`), el firmware marca la condición como no confiable y aplica un valor controlado de demostración (`CO_URGENTE_MIN_PPM + 3.0`) manteniendo estado crítico.
 
 ## Seguridad y confiabilidad
 

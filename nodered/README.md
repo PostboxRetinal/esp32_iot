@@ -12,6 +12,6 @@ Cuando se ejecuta con Podman Compose (`podman-compose`), el proyecto sigue el en
 - En el primer arranque, el contenedor importa automáticamente el flujo y las credenciales en `/data` desde las plantillas del proyecto y las variables de entorno.
 - El control de reimportación está disponible mediante las variables `NR_AUTO_IMPORT` y `NR_FORCE_IMPORT`.
 
-Los valores de MQTT, MariaDB, CORS e identificadores de nodos se obtienen del archivo raíz `.env` y apuntan a Maqiatto/MariaDB.
+Los valores de MQTT, MariaDB, CORS, identificadores de nodos y umbrales compartidos (CO_PPM + ADC) se obtienen del archivo raíz `.env` y apuntan a Maqiatto/MariaDB.
 
 La API REST se sirve directamente desde Node-RED en `http://localhost:1880/api/*`. Todas las rutas `/api/*` requieren `Authorization: Bearer <token>`, validado por `httpNodeMiddleware` en `settings.js` usando la variable `API_BEARER_TOKEN`. Las solicitudes `OPTIONS` se responden con `204` automáticamente para suportar CORS preflight.

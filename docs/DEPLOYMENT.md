@@ -45,9 +45,9 @@ Servicios expuestos:
 1. En el primer arranque (volumen `nodered_data` vacío), el contenedor carga automáticamente:
   - `flows.json` en `/data/flows.json` (sin credenciales inline)
   - `flows_cred.json` cifrado en `/data/flows_cred.json` usando `NODE_RED_CREDENTIAL_SECRET` de `.env`
-  - credenciales MQTT/MySQL extraídas de variables de `.env`
-  - umbrales de CO (`CO_SEGURO_MAX_PPM`, `CO_PRECAUCION_MAX_PPM`, `CO_PELIGRO_MAX_PPM`, `CO_URGENTE_MIN_PPM`) leyendo `include/app_config.h` montado en `/opt/fiot-seed/app_config.h`
-  - espera activa de MariaDB antes de iniciar Node-RED para evitar errores de conexión por arranque desfasado
+   - credenciales MQTT/MySQL extraídas de variables de `.env`
+   - umbrales de CO y ADC (`CO_*`, `MQ7_ADC_*`) desde las variables de entorno de `.env`
+   - espera activa de MariaDB antes de iniciar Node-RED para evitar errores de conexión por arranque desfasado
 2. No es necesario importar desde la UI de Node-RED para arrancar el flujo base.
 3. El seed se ejecuta una sola vez por volumen. Para forzar recarga del flujo:
   - establecer `NR_FORCE_IMPORT=true` en `.env` y reiniciar Node-RED, o
@@ -62,13 +62,9 @@ Servicios expuestos:
 Editar `include/app_config.h`:
 
 - `WIFI_SSID`, `WIFI_PASSWORD`
-- `MQTT_BROKER_HOST` (`maqiatto.com`)
-- `MQTT_BROKER_PORT`
-- `MQTT_USERNAME`, `MQTT_PASSWORD`
-- `MQTT_TOPIC_BASE` (debe incluir prefijo de usuario Maqiatto)
-- `DEVICE_ID`
+- `NTP_SERVER_*`, timings, pines
 
-> Recomendación: mantener consistentes los datos del firmware (`app_config.h`) con los valores MQTT del backend (`.env`).
+> Los valores MQTT y umbrales compartidos (`DEVICE_ID`, `MQTT_*`, `CO_*`, `MQ7_ADC_*`) se leen automáticamente de `.env` mediante el script `scripts/generate_firmware_shared_config.py` durante la compilación con PlatformIO.
 
 Luego compilar y subir con PlatformIO, y abrir el monitor serie.
 
@@ -81,7 +77,7 @@ Luego compilar y subir con PlatformIO, y abrir el monitor serie.
 - En MariaDB verificar inserciones en:
   - `sensor_readings`
   - `state_events`
-  - `alerts` (solo cuando CO >= 22)
+  - `alerts` (solo cuando CO >= CO_PELIGRO_MAX_PPM)
   - `actuator_commands` (cuando se emiten comandos)
 
 También puedes ejecutar los `inject` de consulta histórica en Node-RED para obtener resúmenes rápidos de `sensor_readings`, `state_events`, `alerts` y `actuator_commands`.

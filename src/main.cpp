@@ -8,9 +8,6 @@
 
 #include <app_config.h>
 
-#define MQ7_PIN    4
-#define PIR_PIN    5
-
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 
@@ -33,18 +30,9 @@ void buildTopics() {
   snprintf(topicHeartbeat, sizeof(topicHeartbeat), "%s/%s/heartbeat", MQTT_TOPIC_BASE, DEVICE_ID);
 }
 
-float calcularPPM(int rawValue) {
-  if (rawValue >= MQ7_ADC_SATURATION_RAW) {
-    return MQ7_SATURATED_FALLBACK_PPM;
-  }
-
-  if (rawValue <= 0) {
-    rawValue = 1;
-  }
-
-  float voltage = rawValue * (MQ7_ADC_REF_VOLTAGE / 4095.0f);
-  if (voltage < 0.01f) {
-    voltage = 0.01f;
+float calcularPPMFromVoltage(float voltage) {
+  if (voltage < 0.001f) {
+    voltage = 0.001f;
   }
 
   float rs = (MQ7_SENSOR_VCC_VOLTAGE - voltage) / voltage * MQ7_LOAD_RESISTOR_KOHM;
@@ -181,20 +169,21 @@ String clasificarEstado(float co_ppm, int raw_adc, int pir) {
     }
   }
 
-  if (pir == 1 && (co_ppm > CO_URGENTE_MIN_PPM || raw_adc > MQ7_ADC_URGENTE_MIN_PPM)) {
+  if (pir == 1 && (co_ppm > CO_URGENTE_MIN_PPM || raw_adc > MQ7_ADC_URGENTE_RAW_MIN)) {
     estado += "_URGENTE";
   }
 
   return estado;
 }
 
-void publishTelemetry(int rawCO, float co_ppm, int pir, const String& estado) {
+void publishTelemetry(int rawCO, uint32_t mvCO, float co_ppm, int pir, const String& estado) {
   JsonDocument doc;
   doc["message_id"] = ++messageCounter;
   doc["device_id"] = DEVICE_ID;
   doc["timestamp"] = getTimestamp();
   doc["presencia"] = (pir == 1) ? "SI" : "NO";
   doc["co_ppm"] = roundf(co_ppm * 10.0f) / 10.0f;
+  doc["co_mv"] = mvCO;
   doc["raw_co_adc"] = rawCO;
   doc["estado"] = estado;
 
@@ -310,22 +299,28 @@ void loop() {
   }
 
   int rawCO = analogRead(MQ7_PIN);
+  uint32_t mvCO = 0;
+  float co_ppm;
+
   if (rawCO >= MQ7_ADC_SATURATION_RAW) {
     if (!mq7SaturationWarned) {
       Serial.println("[MQ7] ADC saturado (raw ~4095). Revisa cableado/divisor a 3.3V. Aplicando fallback de ppm.");
       mq7SaturationWarned = true;
     }
+    co_ppm = MQ7_SATURATED_FALLBACK_PPM;
   } else {
     mq7SaturationWarned = false;
+    mvCO = analogReadMilliVolts(MQ7_PIN);
+    float voltage = mvCO / 1000.0f;
+    co_ppm = calcularPPMFromVoltage(voltage);
   }
 
-  float co_ppm = calcularPPM(rawCO);
   int pir = digitalRead(PIR_PIN);
   String estado = clasificarEstado(co_ppm, rawCO, pir);
 
   if (now - lastTelemetryMs >= TELEMETRY_PUBLISH_INTERVAL_MS) {
     lastTelemetryMs = now;
-    publishTelemetry(rawCO, co_ppm, pir, estado);
+    publishTelemetry(rawCO, mvCO, co_ppm, pir, estado);
   }
 
   delay(20);

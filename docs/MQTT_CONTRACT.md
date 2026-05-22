@@ -45,6 +45,7 @@
   "timestamp": "2026-04-14T10:23:45-05:00",
   "co_ppm": 18.4,
   "raw_co_adc": 1840,
+  "co_mv": 115,
   "presencia": "SI",
   "estado": "PELIGRO"
 }
@@ -54,6 +55,7 @@ Campos aceptados adicionales:
 
 - `message_id` (entero incremental)
 - `raw_co_adc` (ADC crudo)
+- `co_mv` (mV calibrados, solo diagnóstico MQTT/Serial — no persiste en DB, no se expone en API ni dashboard)
 
 ## Reglas de validación
 

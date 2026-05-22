@@ -24,12 +24,12 @@ La limpieza se realiza en Node-RED, en la función `Normalize + derive state`:
 - normaliza `presencia` a booleano y texto `SI`/`NO`;
 - convierte `raw_co_adc` a número;
 - asigna timestamp cuando falta;
-- **recalcula `estado` del lado del servidor usando lógica de doble disparador (OR)**:
-  - Estado `SEGURO`: `co_ppm < CO_SEGURO_MAX_PPM` y `raw_co_adc < MQ7_ADC_SEGURO_RAW_MAX`.
-  - Estado `PRECAUCION`: si `co_ppm` o `raw_co_adc` superan sus umbrales de SEGURO.
-  - Estado `PELIGRO`: si `co_ppm` o `raw_co_adc` superan sus umbrales de PRECAUCION.
+- **recalcula `estado` del lado del servidor usando lógica de doble disparador (AND para niveles, OR para urgencia)**:
+  - Estado `SEGURO`: `co_ppm < CO_SEGURO_MAX_PPM` Y `raw_co_adc < MQ7_ADC_SEGURO_RAW_MAX`.
+  - Estado `PRECAUCION`: `co_ppm < CO_PRECAUCION_MAX_PPM` Y `raw_co_adc < MQ7_ADC_PRECAUCION_RAW_MAX`.
+  - Estado `PELIGRO`: `co_ppm < CO_PELIGRO_MAX_PPM` Y `raw_co_adc < MQ7_ADC_PELIGRO_RAW_MAX`.
   - Estado `CRITICO`: si `co_ppm` o `raw_co_adc` superan sus umbrales de PELIGRO.
-  - Urgencia (`_URGENTE`): si hay presencia y (`co_ppm` > URGENTE_PPM o `raw_co_adc` > URGENTE_RAW).
+  - Urgencia (`_URGENTE`): si hay presencia Y (`co_ppm > CO_URGENTE_MIN_PPM` O `raw_co_adc > MQ7_ADC_URGENTE_RAW_MIN`).
 - descarta mensajes inválidos antes de persistir.
 
 El análisis se expone desde Node-RED:
@@ -38,7 +38,7 @@ El análisis se expone desde Node-RED:
 - `GET /api/analytics/state-distribution?hours=24`: distribución de estados.
 - `GET /api/analytics/timeseries?device_id=&hours=24`: serie temporal de CO por minuto y nodo (incluye `avg_raw_co_adc`).
 
-Valor para el problema: permite identificar periodos de mayor concentración de CO, validar si hay presencia durante estados críticos y priorizar acciones de ventilación o evacuación. La incorporación de `raw_co_adc` permite verificar el disparador por cualquiera de los dos sensores.
+Valor para el problema: permite identificar periodos de mayor concentración de CO, validar si hay presencia durante estados críticos y priorizar acciones de ventilación o evacuación. La incorporación de `raw_co_adc` permite verificar el disparador por cualquiera de los dos sensores. El campo `co_mv` se envía solo para diagnóstico en MQTT/Serial y no se persiste en DB ni se expone en API/dashboard.
 
 ## 4. Interfaces REST
 

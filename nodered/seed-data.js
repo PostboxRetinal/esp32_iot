@@ -4,7 +4,6 @@ const crypto = require("crypto");
 
 const dataDir = process.env.NODE_RED_USER_DIR || "/data";
 const templatePath = "/opt/fiot-seed/flows.template.json";
-const firmwareConfigHeaderPath = process.env.FIRMWARE_CONFIG_HEADER || "/opt/fiot-seed/app_config.h";
 const outputFlowPath = path.join(dataDir, "flows.json");
 const outputCredPath = path.join(dataDir, "flows_cred.json");
 
@@ -14,7 +13,12 @@ const thresholdKeys = [
   "CO_SEGURO_MAX_PPM",
   "CO_PRECAUCION_MAX_PPM",
   "CO_PELIGRO_MAX_PPM",
-  "CO_URGENTE_MIN_PPM"
+  "CO_URGENTE_MIN_PPM",
+  "MQ7_ADC_SEGURO_RAW_MAX",
+  "MQ7_ADC_PRECAUCION_RAW_MAX",
+  "MQ7_ADC_PELIGRO_RAW_MAX",
+  "MQ7_ADC_URGENTE_RAW_MIN",
+  "MQ7_ADC_SATURATION_RAW",
 ];
 
 const replacementKeys = [
@@ -33,113 +37,12 @@ const replacementKeys = [
   ...thresholdKeys
 ];
 
-function extractDefines(headerContent) {
-  const defines = {};
-  const lines = headerContent.split(/\r?\n/);
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("#define ")) {
-      continue;
-    }
-
-    const match = trimmed.match(/^#define\s+([A-Z][A-Z0-9_]*)\s+(.+)$/);
-    if (!match) {
-      continue;
-    }
-
-    const key = match[1];
-    const rawValue = match[2].replace(/\/\/.*$/, "").trim();
-    if (!rawValue) {
-      continue;
-    }
-
-    defines[key] = rawValue;
-  }
-
-  return defines;
-}
-
-function toNumberIfPossible(raw) {
-  const normalized = raw.replace(/\s+/g, "").replace(/[()]/g, "").replace(/[fF]$/, "");
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function resolveDefineAsNumber(key, defines, visited = new Set()) {
-  if (visited.has(key)) {
-    return null;
-  }
-
-  const raw = defines[key];
-  if (typeof raw !== "string") {
-    return null;
-  }
-
-  const numeric = toNumberIfPossible(raw);
-  if (numeric !== null) {
-    return numeric;
-  }
-
-  const alias = raw.replace(/\s+/g, "");
-  if (!/^[A-Z][A-Z0-9_]*$/.test(alias)) {
-    return null;
-  }
-
-  visited.add(key);
-  const resolved = resolveDefineAsNumber(alias, defines, visited);
-  visited.delete(key);
-  return resolved;
-}
-
-function loadThresholdsFromFirmwareHeader(headerPath) {
-  if (!fs.existsSync(headerPath)) {
-    console.warn(`[fiot-nodered] Firmware header not found at ${headerPath}; using environment/default threshold values.`);
-    return {};
-  }
-
-  try {
-    const stat = fs.statSync(headerPath);
-    if (!stat.isFile()) {
-      console.warn(`[fiot-nodered] Firmware header path ${headerPath} is not a file; using environment/default threshold values.`);
-      return {};
-    }
-  } catch (error) {
-    console.warn(`[fiot-nodered] Unable to inspect firmware header at ${headerPath}: ${error.message}; using environment/default threshold values.`);
-    return {};
-  }
-
-  const headerContent = fs.readFileSync(headerPath, "utf8");
-  const defines = extractDefines(headerContent);
-  const resolved = {};
-
-  for (const key of thresholdKeys) {
-    const value = resolveDefineAsNumber(key, defines);
-    if (value !== null) {
-      resolved[key] = value;
-    }
-  }
-
-  if (resolved.CO_URGENTE_MIN_PPM == null && resolved.CO_PELIGRO_MAX_PPM != null) {
-    resolved.CO_URGENTE_MIN_PPM = resolved.CO_PELIGRO_MAX_PPM;
-  }
-
-  return resolved;
-}
-
 function encryptCredentials(credentialSecret, credentials) {
   const key = crypto.createHash("sha256").update(credentialSecret).digest();
   const initVector = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv(encryptionAlgorithm, key, initVector);
   const encrypted = cipher.update(JSON.stringify(credentials), "utf8", "base64") + cipher.final("base64");
   return { $: initVector.toString("hex") + encrypted };
-}
-
-const firmwareThresholds = loadThresholdsFromFirmwareHeader(firmwareConfigHeaderPath);
-for (const key of thresholdKeys) {
-  if (firmwareThresholds[key] != null) {
-    process.env[key] = String(firmwareThresholds[key]);
-  }
 }
 
 let flowsTemplate = fs.readFileSync(templatePath, "utf8");

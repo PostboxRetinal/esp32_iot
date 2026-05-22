@@ -3,8 +3,10 @@
 .vscode
 node_modules/
 dist/
+
 *.tsbuildinfo
 
 # Ignore environment files with sensitive information
-*.h
+include/app_config.h
+include/app_shared_config.generated.h
 .env
