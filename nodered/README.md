@@ -14,4 +14,4 @@ Cuando se ejecuta con Podman Compose (`podman-compose`), el proyecto sigue el en
 
 Los valores de MQTT, MariaDB, CORS, identificadores de nodos y umbrales compartidos (CO_PPM + ADC) se obtienen del archivo raíz `.env` y apuntan a Maqiatto/MariaDB.
 
-La API REST se sirve directamente desde Node-RED en `http://localhost:1880/api/*`. Todas las rutas `/api/*` requieren `Authorization: Bearer <token>`, validado por `httpNodeMiddleware` en `settings.js` usando la variable `API_BEARER_TOKEN`. Las solicitudes `OPTIONS` se responden con `204` automáticamente para suportar CORS preflight.
+La API REST se sirve directamente desde Node-RED en `http://localhost:1880/api/*`. Todas las rutas `/api/*` requieren `Authorization: Bearer <token>`, validado por `httpNodeMiddleware` en `settings.js` usando la variable `API_BEARER_TOKEN`. Las solicitudes `OPTIONS` se responden con `204` automáticamente para soportar CORS preflight.

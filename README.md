@@ -68,8 +68,8 @@ Regla de urgencia (doble disparador OR):
 
 Regla de alerta:
 
-- Se genera alerta cuando `co_ppm >= CO_PELIGRO_MAX_PPM`
-- Severidad `CRITICAL` si además `presencia == SI`, de lo contrario `HIGH`
+- Se genera alerta cuando el estado derivado es `PELIGRO`, `CRITICO` o cualquier `_URGENTE`
+- Severidad `CRITICAL` si `urgente == true`, de lo contrario `HIGH`
 
 Fuente única de los umbrales compartidos (MQTT + DEVICE_ID + CO + ADC):
 

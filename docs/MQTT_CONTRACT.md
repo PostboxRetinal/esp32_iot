@@ -51,19 +51,25 @@
 }
 ```
 
-Campos aceptados adicionales:
+Campos del payload de telemetría:
 
-- `message_id` (entero incremental)
-- `raw_co_adc` (ADC crudo)
-- `co_mv` (mV calibrados, solo diagnóstico MQTT/Serial — no persiste en DB, no se expone en API ni dashboard)
+- `device_id` (string, requerido)
+- `timestamp` (string ISO-8601, opcional — Node-RED asigna hora del servidor si falta)
+- `co_ppm` (numérico, requerido)
+- `raw_co_adc` (entero 0–4095, requerido)
+- `presencia` (`SI`/`NO` o booleano, requerido)
+- `estado` (string, opcional — Node-RED recalcula del lado del servidor si está presente)
+- `message_id` (entero incremental, opcional)
+- `co_mv` (mV calibrados, opcional — solo diagnóstico MQTT/Serial; no persiste en DB, no se expone en API ni dashboard)
 
 ## Reglas de validación
 
 - `device_id`: string no vacío
 - `timestamp`: string ISO-8601 (si falta, Node-RED usa la hora del servidor)
 - `co_ppm`: numérico
+- `raw_co_adc`: entero entre 0 y 4095 (validado por Node-RED)
 - `presencia`: `SI`/`NO` (o equivalentes booleanos)
-- `estado`: clasificación del evento (`SEGURO`, `PRECAUCION`, `PELIGRO`, `CRITICO`, `CRITICO_URGENTE`)
+- `estado`: string opcional (Node-RED recalcula; ej: `SEGURO`, `PRECAUCION`, `PELIGRO`, `CRITICO`, `SEGURO_URGENTE`, `CRITICO_URGENTE`)
 
 ## QoS y retención recomendados
 
@@ -81,9 +87,9 @@ Campos aceptados adicionales:
 
 Node-RED distingue la fuente exclusivamente por `device_id`.
 
-## Regla de Maqiatto para tópicos
+## Regla de los tópicos (Maqiatto)
 
 - Maqiatto requiere usar tópicos bajo tu prefijo de usuario.
-- En este proyecto, ese prefijo se define con `MQTT_TOPIC_BASE`.
+- En este proyecto, ese prefijo se define con `MQTT_TOPIC_BASE` o con la variable de entorno `MQTT_BROKER_HOST` para distinguir brokers.
 - Ejemplo recomendado en `.env`:
   - `MQTT_TOPIC_BASE=tu_usuario_maqiatto/fiot/garage`

@@ -4,7 +4,7 @@
 
 1. Copiar y ajustar variables en `.env` (o usar `.env.example` como base).
 2. Mantener IDs de nodos distintos (`HARDWARE_DEVICE_ID` y `SIM_DEVICE_ID`).
-3. Si cambias usuario/clave en `.env`, no necesitas editar `docker-compose.yml` ni `nodered/flows.json`.
+3. Si cambias usuario/clave en `.env`, no necesitas editar `podman-compose.yml` ni `nodered/flows.json`.
 4. Definir `MQTT_TOPIC_BASE` con prefijo de usuario Maqiatto, por ejemplo:
   - `tu_usuario_maqiatto/fiot/garage`
 5. Opcionalmente ajustar rama de comandos:
@@ -55,16 +55,16 @@ Servicios expuestos:
 
 > Importante: si ya tenías el volumen de MariaDB creado antes de esta versión, `schema.sql` no se vuelve a ejecutar automáticamente. Para incluir tablas o columnas nuevas (por ejemplo `actuator_commands` o `alerts.raw_co_adc`), aplica una migración manual o recrea el volumen `mariadb_data`.
 > Reimportación: `auto-import-entrypoint.sh` compara el hash combinado de `flows.template.json`, `seed-data.js` y `settings.js`. Si cambia cualquiera, se aplica una reimportación automática al reiniciar el contenedor de Node-RED.
-> Despliegue: usa `podman-compose down && podman-compose up --build -d` para asegurar que los cambios locales en el código y los volúmenes se propaguen correctamente.
+> Despliegue: usa `podman-compose --env-file .env -f podman-compose.yml down && podman-compose --env-file .env -f podman-compose.yml up --build -d` para asegurar que los cambios locales en el código y los volúmenes se propaguen correctamente.
 
 ## 4) Configurar firmware ESP32
 
-Editar `include/app_config.h`:
+Editar `include/app_config.h` (solo valores locales del firmware):
 
 - `WIFI_SSID`, `WIFI_PASSWORD`
 - `NTP_SERVER_*`, timings, pines
 
-> Los valores MQTT y umbrales compartidos (`DEVICE_ID`, `MQTT_*`, `CO_*`, `MQ7_ADC_*`) se leen automáticamente de `.env` mediante el script `scripts/generate_firmware_shared_config.py` durante la compilación con PlatformIO.
+> Los valores MQTT y umbrales compartidos (`DEVICE_ID`, `MQTT_*`, `CO_*`, `MQ7_ADC_*`) se leen automáticamente de `.env` mediante el script `scripts/generate_firmware_shared_config.py` que genera `include/app_shared_config.generated.h` durante la compilación con PlatformIO. El contenedor Node-RED nunca accede a `app_config.h`.
 
 Luego compilar y subir con PlatformIO, y abrir el monitor serie.
 
@@ -77,7 +77,7 @@ Luego compilar y subir con PlatformIO, y abrir el monitor serie.
 - En MariaDB verificar inserciones en:
   - `sensor_readings`
   - `state_events`
-  - `alerts` (solo cuando CO >= CO_PELIGRO_MAX_PPM)
+  - `alerts` (solo cuando el estado derivado es `PELIGRO`, `CRITICO` o `_URGENTE`)
   - `actuator_commands` (cuando se emiten comandos)
 
 También puedes ejecutar los `inject` de consulta histórica en Node-RED para obtener resúmenes rápidos de `sensor_readings`, `state_events`, `alerts` y `actuator_commands`.

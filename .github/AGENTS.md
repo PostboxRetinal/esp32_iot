@@ -18,7 +18,7 @@
 - No root-level test, linter, formatter, CI, or pre-commit config was found; use targeted checks instead of inventing root `npm test` or lint commands.
 
 ## Deployment Gotchas
-- Current files are root `.env.example` and `podman-compose.yml`, while several docs still mention `infrastructure/.env` and `infrastructure/docker-compose.yml`. Trust checked-in config over those stale prose paths.
+- Compose infrastructure lives at root `podman-compose.yml` and `database/schema.sql`. No `infrastructure/` directory is used; docs have been updated to reflect this.
 - If working on compose deployment, keep compose location and bind mounts in sync. The root `podman-compose.yml` uses repo-root-relative mounts like `./database/schema.sql`.
 - Node-RED seeds `/data/flows.json` and `/data/flows_cred.json` cifrado solo en el primer arranque del volumen `nodered_data`. Las credenciales se cifran con `aes-256-ctr` usando `NODE_RED_CREDENTIAL_SECRET` de `.env`. Usa `NR_FORCE_IMPORT=true` o recrea el volumen para resembrar cambios en el flujo.
 - All `/api/*` routes require `Authorization: Bearer <token>` via `httpNodeMiddleware` in `nodered/settings.js`. The token comes from `API_BEARER_TOKEN` in `.env`. OPTIONS requests are handled by the middleware (204 + CORS headers).
@@ -27,4 +27,4 @@
 - If `nodered/settings.js` is updated, existing `nodered_data` volumes keep the old copy. Delete `/data/settings.js` inside the container or recreate the volume to pick up changes.
 
 ## Secrets
-- `.env` is ignored and should not be read, printed, or committed. Treat local headers such as `include/app_config.h` and ignored `include/config.h` as potentially sensitive when reporting findings.
+- `.env`, `include/app_config.h`, and `include/app_shared_config.generated.h` are ignored and should not be read, printed, or committed. Treat them as potentially sensitive when reporting findings.

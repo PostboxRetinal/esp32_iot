@@ -28,7 +28,7 @@ La limpieza se realiza en Node-RED, en la función `Normalize + derive state`:
   - Estado `SEGURO`: `co_ppm < CO_SEGURO_MAX_PPM` Y `raw_co_adc < MQ7_ADC_SEGURO_RAW_MAX`.
   - Estado `PRECAUCION`: `co_ppm < CO_PRECAUCION_MAX_PPM` Y `raw_co_adc < MQ7_ADC_PRECAUCION_RAW_MAX`.
   - Estado `PELIGRO`: `co_ppm < CO_PELIGRO_MAX_PPM` Y `raw_co_adc < MQ7_ADC_PELIGRO_RAW_MAX`.
-  - Estado `CRITICO`: si `co_ppm` o `raw_co_adc` superan sus umbrales de PELIGRO.
+  - Estado `CRITICO`: si `co_ppm >= CO_PELIGRO_MAX_PPM` o `raw_co_adc >= MQ7_ADC_PELIGRO_RAW_MAX`.
   - Urgencia (`_URGENTE`): si hay presencia Y (`co_ppm > CO_URGENTE_MIN_PPM` O `raw_co_adc > MQ7_ADC_URGENTE_RAW_MIN`).
 - descarta mensajes inválidos antes de persistir.
 
@@ -58,12 +58,12 @@ La API REST está implementada 100% en Node-RED dentro de `nodered/flows.json`, 
 | GET | `/api/commands/recent?limit=` | Auditoría reciente de comandos |
 | POST | `/api/commands/ventilation` | Publicar comando MQTT de ventilación |
 
-Las operaciones se pueden probar en Postman usando `http://localhost:1880` como base URL y añadiendo el header `Authorization: Bearer <token>`. Los ejemplos `curl` equivalen a las mismas solicitudes REST con el header de autorización.
+Las operaciones se pueden probar con la colección de Insomnia en `docs/insomnia-node-red-api.json` usando `http://localhost:1880` como base URL y añadiendo el header `Authorization: Bearer <token>`. Los ejemplos `curl` equivalen a las mismas solicitudes REST con el header de autorización.
 
 Ejemplo de comando:
 
 ```sh
-TOKEN="01d288152eea8327efae2b12ff8de01f78c4d1043791ea5b8efb364064d61a4d"  # valor de API_BEARER_TOKEN en .env
+TOKEN="<API_BEARER_TOKEN>"  # valor de API_BEARER_TOKEN en .env
 curl -X POST http://localhost:1880/api/commands/ventilation \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $TOKEN" \
