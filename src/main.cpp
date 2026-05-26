@@ -148,15 +148,15 @@ void ensureMqttConnection() {
 String clasificarEstado(float co_ppm, int raw_adc, int pir) {
   String estado;
 
-  if (co_ppm < CO_SEGURO_MAX_PPM && raw_adc < MQ7_ADC_SEGURO_RAW_MAX) {
+  if (co_ppm < CO_SEGURO_MAX_PPM || raw_adc < MQ7_ADC_SEGURO_RAW_MAX) {
     estado = "SEGURO";
     setRgbLed(0, RGB_BRIGHTNESS, 0);
     ledState = false;
-  } else if (co_ppm < CO_PRECAUCION_MAX_PPM && raw_adc < MQ7_ADC_PRECAUCION_RAW_MAX) {
+  } else if (co_ppm < CO_PRECAUCION_MAX_PPM || raw_adc < MQ7_ADC_PRECAUCION_RAW_MAX) {
     estado = "PRECAUCION";
     setRgbLed(RGB_BRIGHTNESS, RGB_BRIGHTNESS, 0);
     ledState = false;
-  } else if (co_ppm < CO_PELIGRO_MAX_PPM && raw_adc < MQ7_ADC_PELIGRO_RAW_MAX) {
+  } else if (co_ppm < CO_PELIGRO_MAX_PPM || raw_adc < MQ7_ADC_PELIGRO_RAW_MAX) {
     estado = "PELIGRO";
     setRgbLed(RGB_BRIGHTNESS, 0, 0);
     ledState = false;
