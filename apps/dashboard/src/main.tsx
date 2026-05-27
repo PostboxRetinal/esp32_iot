@@ -20,7 +20,8 @@ import "@fontsource/jetbrains-mono/latin-700.css";
 import "@fontsource/space-grotesk/latin-400.css";
 import "@fontsource/space-grotesk/latin-700.css";
 
-import { api, type Alert, type Device, type Reading, type StateDistribution, type Summary, type TimeseriesPoint } from "./api";
+import { api } from "./api";
+import { Alert, AlertToastLike, AlertToastTheme, DashboardData, Device, Reading, StateChartDatum, StateChartTooltipProps, StateDistribution, Summary, TimeseriesPoint } from "./types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -35,22 +36,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import "./styles.css";
-
-type DashboardData = {
-  health: { ok: boolean; db: string; mqtt: string; command_topic?: string; timestamp: string } | null;
-  devices: Device[];
-  readings: Reading[];
-  alerts: Alert[];
-  summary: Summary | null;
-  states: StateDistribution[];
-  timeseries: TimeseriesPoint[];
-};
-
-type StateChartDatum = {
-  label: string;
-  value: number;
-  color: string;
-};
 
 const initialData: DashboardData = {
   health: null,
@@ -87,15 +72,6 @@ function getStateColor(state: string) {
 
   return statePalette[state] || "#94a3b8";
 }
-
-type AlertToastLike = Pick<Alert, "device_id" | "device_timestamp" | "severity" | "estado" | "message" | "co_ppm" | "raw_co_adc" | "presencia" | "urgente">;
-
-type AlertToastTheme = {
-  background: string;
-  border: string;
-  accent: string;
-  color: string;
-};
 
 const alertToastThemes: Record<Alert["severity"], AlertToastTheme> = {
   INFO: {
@@ -166,12 +142,6 @@ function notifyAlert(alert: AlertToastLike) {
 
   toast.info(title, { description, style: toastStyle, classNames: toastClassNames });
 }
-
-type StateChartTooltipProps = {
-  active?: boolean;
-  payload?: Array<{ payload?: StateChartDatum }>;
-  total: number;
-};
 
 function StateChartTooltip({ active, payload, total }: StateChartTooltipProps) {
   if (!active || !payload?.length) {
