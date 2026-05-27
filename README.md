@@ -75,7 +75,7 @@ Fuente única de los umbrales compartidos (MQTT + DEVICE_ID + CO + ADC):
 
 - Archivo `.env` en la raíz del proyecto
 - Firmware: `scripts/generate_firmware_shared_config.py` genera `include/app_shared_config.generated.h` desde `.env` durante la compilación
-- Node-RED: `seed-data.js` reemplaza tokens `${...}` en `flows.json` con valores de `process.env` heredados de `.env`
+- Node-RED: `seed-data.js` reemplaza tokens `${...}` en `flow_parcial3.json` con valores de `process.env` heredados de `.env`
 
 Nota de conversión MQ-7:
 
@@ -96,7 +96,7 @@ Nota de conversión MQ-7:
   - `fiot-nodered`
   - `fiot-mariadb`
   - `fiot-dashboard`
-- `nodered/flows.json`: procesamiento, simulación, persistencia y API REST
+- `nodered/flow_parcial3.json`: procesamiento, simulación, persistencia y API REST
 - `database/schema.sql`: modelo relacional
 - `docs/PARCIAL3.md`: evidencia de implementación
 

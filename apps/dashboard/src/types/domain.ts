@@ -1,3 +1,11 @@
+export type HealthStatus = {
+  ok: boolean;
+  db: string;
+  mqtt: string;
+  command_topic?: string;
+  timestamp: string;
+};
+
 export type Device = {
   device_id: string;
   node_type: "hardware" | "simulated";

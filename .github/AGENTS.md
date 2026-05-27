@@ -4,7 +4,7 @@
 - Three runtimes live here: ESP32 Arduino firmware in `src/main.cpp` using PlatformIO env `esp32-s3-n16r8-uart`, Node-RED in `nodered/` for processing and REST, and React dashboard in `apps/dashboard`. MariaDB schema lives in `database/schema.sql`.
 - Active firmware config is `include/app_config.h`; `src/main.cpp` includes that file, not `include/config.h`.
 - `include/app_shared_config.generated.h` is auto-generated from `.env` by `scripts/generate_firmware_shared_config.py` at build time via PlatformIO `extra_scripts`. It contains MQTT credentials, `DEVICE_ID`, and all `CO_*`/`MQ7_ADC_*` threshold macros. It is `.gitignore`d.
-- Node-RED uses `nodered/flows.json` as a template. `nodered/seed-data.js` replaces `${...}` tokens from `process.env` (inherited from `.env` via `env_file` in compose). No firmware header is read or mounted inside the Node-RED container.
+- Node-RED uses `nodered/flow_parcial3.json` as a template. `nodered/seed-data.js` replaces `${...}` tokens from `process.env` (inherited from `.env` via `env_file` in compose). No firmware header is read or mounted inside the Node-RED container.
 - MQTT topics must stay under `MQTT_TOPIC_BASE`, which must include the Maqiatto username prefix. Node-RED distinguishes hardware vs simulator by `device_id` only.
 
 ## Commands
@@ -13,7 +13,7 @@
 - Serial monitor uses `monitor_speed = 115200`: `pio device monitor -b 115200`
 - Seed script syntax check: `node --check nodered/seed-data.js`
 - Entrypoint shell syntax check: `sh -n nodered/auto-import-entrypoint.sh`
-- Flow JSON syntax check: `node -e 'JSON.parse(require("fs").readFileSync("nodered/flows.json", "utf8"))'`
+- Flow JSON syntax check: `node -e 'JSON.parse(require("fs").readFileSync("nodered/flow_parcial3.json", "utf8"))'`
 - Dashboard build: `cd apps/dashboard && bun install && bun run build`
 - No root-level test, linter, formatter, CI, or pre-commit config was found; use targeted checks instead of inventing root `npm test` or lint commands.
 

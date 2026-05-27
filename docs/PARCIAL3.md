@@ -5,7 +5,7 @@ Este documento resume cómo la implementación del repositorio cumple los requer
 ## 1. Dos nodos IoT activos
 
 - Nodo real: `ESP32-GARAGE-CO-001`, firmware PlatformIO para ESP32-S3 N16R8 en `src/main.cpp`.
-- Nodo simulado: `SIM-GARAGE-CO-001`, generado por el flujo Node-RED en `nodered/flows.json`.
+- Nodo simulado: `SIM-GARAGE-CO-001`, generado por el flujo Node-RED en `nodered/flow_parcial3.json`.
 - Ambos publican telemetría MQTT en `MQTT_TOPIC_BASE/telemetry` y Node-RED persiste los datos en MariaDB.
 
 ## 2. Plataforma IoT operativa
@@ -42,7 +42,7 @@ Valor para el problema: permite identificar periodos de mayor concentración de 
 
 ## 4. Interfaces REST
 
-La API REST está implementada 100% en Node-RED dentro de `nodered/flows.json`, usando nodos `http in`, `function`, `mysql`, `mqtt out` y `http response`. Todas las rutas `/api/*` requieren el header `Authorization: Bearer <token>` donde `<token>` es el valor de `API_BEARER_TOKEN` definido en `.env` (generar con `openssl rand -hex 32`).
+La API REST está implementada 100% en Node-RED dentro de `nodered/flow_parcial3.json`, usando nodos `http in`, `function`, `mysql`, `mqtt out` y `http response`. Todas las rutas `/api/*` requieren el header `Authorization: Bearer <token>` donde `<token>` es el valor de `API_BEARER_TOKEN` definido en `.env` (generar con `openssl rand -hex 32`).
 
 | Método | Ruta | Propósito |
 | --- | --- | --- |

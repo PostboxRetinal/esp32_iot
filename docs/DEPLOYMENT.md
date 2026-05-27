@@ -4,7 +4,7 @@
 
 1. Copiar y ajustar variables en `.env` (o usar `.env.example` como base).
 2. Mantener IDs de nodos distintos (`HARDWARE_DEVICE_ID` y `SIM_DEVICE_ID`).
-3. Si cambias usuario/clave en `.env`, no necesitas editar `podman-compose.yml` ni `nodered/flows.json`.
+3. Si cambias usuario/clave en `.env`, no necesitas editar `podman-compose.yml` ni `nodered/flow_parcial3.json`.
 4. Definir `MQTT_TOPIC_BASE` con prefijo de usuario Maqiatto, por ejemplo:
   - `tu_usuario_maqiatto/fiot/garage`
 5. Opcionalmente ajustar rama de comandos:
@@ -43,7 +43,7 @@ Servicios expuestos:
 ## 3) Importación automática del flujo (sin pasos manuales)
 
 1. En el primer arranque (volumen `nodered_data` vacío), el contenedor carga automáticamente:
-  - `flows.json` en `/data/flows.json` (sin credenciales inline)
+  - `flow_parcial3.json` en `/data/flows.json` (sin credenciales inline)
   - `flows_cred.json` cifrado en `/data/flows_cred.json` usando `NODE_RED_CREDENTIAL_SECRET` de `.env`
    - credenciales MQTT/MySQL extraídas de variables de `.env`
    - umbrales de CO y ADC (`CO_*`, `MQ7_ADC_*`) desde las variables de entorno de `.env`

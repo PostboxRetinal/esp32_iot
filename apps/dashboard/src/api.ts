@@ -1,4 +1,4 @@
-import { Device, Reading, Alert, Summary, StateDistribution, TimeseriesPoint, Command } from "./types";
+import { Device, HealthStatus, Reading, Alert, Summary, StateDistribution, TimeseriesPoint, Command } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:1880";
 const API_BEARER_TOKEN = import.meta.env.VITE_API_BEARER_TOKEN || "";
@@ -42,7 +42,7 @@ function withQuery(path: string, params: Record<string, string | number | undefi
 
 export const api = {
   baseUrl: API_BASE_URL,
-  health: () => request<{ ok: boolean; db: string; mqtt: string; command_topic?: string; timestamp: string }>("/api/health"),
+  health: () => request<HealthStatus>("/api/health"),
   devices: () => request<{ data: Device[] }>("/api/devices"),
   latestReadings: (limit = 30, deviceId?: string) => request<{ data: Reading[] }>(withQuery("/api/readings/latest", { limit, device_id: deviceId })),
   recentAlerts: (hours = 24, limit = 20, deviceId?: string) => request<{ data: Alert[] }>(withQuery("/api/alerts/recent", { hours, limit, device_id: deviceId })),

@@ -1,9 +1,9 @@
 # Recursos de Node-RED
 
-- `flows.json`: flujo de ingesta, procesamiento, simulación, persistencia y API REST.
+- `flow_parcial3.json`: flujo de ingesta, procesamiento, simulación, persistencia y API REST.
 - `package.json`: nodos extra de Node-RED requeridos por este flujo (`node-red-node-mysql`).
 - `Dockerfile`: imagen personalizada de Node-RED que instala las dependencias de `package.json`.
-- `seed-data.js` + `auto-import-entrypoint.sh`: carga inicial de `flows.json` y `flows_cred.json` cifrado en `/data`. Las credenciales se cifran con `aes-256-ctr` usando `NODE_RED_CREDENTIAL_SECRET`.
+- `seed-data.js` + `auto-import-entrypoint.sh`: carga inicial de `flow_parcial3.json` y `flows_cred.json` cifrado en `/data`. Las credenciales se cifran con `aes-256-ctr` usando `NODE_RED_CREDENTIAL_SECRET`.
 
 Cuando se ejecuta con Podman Compose (`podman-compose`), el proyecto sigue el enfoque oficial de la imagen Docker de Node-RED:
 

@@ -1,7 +1,7 @@
-import type { Alert, Device, Reading, StateDistribution, Summary, TimeseriesPoint } from "./domain";
+import type { Alert, Device, HealthStatus, Reading, StateDistribution, Summary, TimeseriesPoint } from "./domain";
 
 export type DashboardData = {
-  health: { ok: boolean; db: string; mqtt: string; command_topic?: string; timestamp: string } | null;
+  health: HealthStatus | null;
   devices: Device[];
   readings: Reading[];
   alerts: Alert[];

@@ -373,18 +373,29 @@ function App() {
     setReadAlertIds(ids);
   }
 
-  function formatLastSeen(value: string) {
-    const date = new Date(value);
-    const diffMs = Date.now() - date.getTime();
-    const diffSec = Math.max(0, Math.floor(diffMs / 1000));
+function formatLastSeen(value: string | null) {
+  if (value == null) return "--";
+  const date = new Date(value);
+  const diffMs = Date.now() - date.getTime();
+  const diffSec = Math.max(0, Math.floor(diffMs / 1000));
 
-    if (diffSec < 60) {
-      return `${diffSec}s`;
-    }
+  if (diffSec < 60) {
+    return `${diffSec}s`;
+  }
 
-    const diffMin = Math.floor(diffSec / 60);
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) {
     return `${diffMin}m`;
   }
+
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) {
+    return `${diffHours}h`;
+  }
+
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d`;
+}
 
   return (
     <main className="shell">
@@ -662,7 +673,7 @@ function App() {
                       <span className={`node-state-dot ${device.connection_state}`} />
                       {device.connection_state === "online" ? "Online" : "Offline"}
                     </span>
-                    · last seen {formatLastSeen(device.last_seen_at)}
+                    · last seen {formatLastSeen(device.latest_reading_at)}
                   </small>
                 </div>
                 <span>{fmt(device.latest_co_ppm, " ppm")} <small className="ml-1 opacity-50">({fmt(device.latest_raw_co_adc)})</small></span>
