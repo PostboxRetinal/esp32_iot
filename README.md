@@ -10,8 +10,8 @@ Realizar limpieza y análisis de datos IoT, exponerlos mediante interfaces REST 
 
 ## Arquitectura
 
-- Nodo hardware: `ESP32-GARAGE-CO-001`
-- Nodo simulado: `SIM-GARAGE-CO-001`
+- Nodo hardware: configurable via `HARDWARE_DEVICE_ID` en `.env`
+- Nodo simulado: configurable via `SIM_DEVICE_ID` en `.env`
 - Backend IoT y API REST: Node-RED
 - Persistencia: MariaDB
 - Visualización: ReactTS
@@ -21,7 +21,7 @@ Realizar limpieza y análisis de datos IoT, exponerlos mediante interfaces REST 
 
 1. El ESP32 lee MQ-7 y PIR cada 5 segundos.
 2. Node-RED genera telemetría simulada para el segundo nodo.
-3. Ambos nodos publican en `fiot/garage/telemetry`.
+3. Ambos nodos publican en `<MQTT_TOPIC_BASE>/telemetry`.
 4. Node-RED valida, normaliza y clasifica la telemetría, guarda lecturas y genera alertas o comandos.
 5. La API REST de Node-RED expone consultas para el dashboard y para clientes externos.
 6. La aplicación web muestra estado, tendencias, alertas y auditoría de comandos.
@@ -75,11 +75,11 @@ Fuente única de los umbrales compartidos (MQTT + DEVICE_ID + CO + ADC):
 
 - Archivo `.env` en la raíz del proyecto
 - Firmware: `scripts/generate_firmware_shared_config.py` genera `include/app_shared_config.generated.h` desde `.env` durante la compilación
-- Node-RED: `seed-data.js` reemplaza tokens `${...}` en `flow_parcial3.json` con valores de `process.env` heredados de `.env`
+- Node-RED: al iniciar el contenedor, `auto-import-entrypoint.sh` ejecuta `seed-data.js` sobre el template `/opt/fiot-seed/flows.template.json` (derivado de `nodered/flow_parcial3.json` durante el build), reemplazando tokens `${...}` con valores de `process.env` heredados de `.env`
 
 Nota de conversión MQ-7:
 
-- Si `raw_co_adc` llega a zona de saturación ADC (`>= 4090`), el firmware marca la condición como no confiable y aplica un valor controlado de demostración (`CO_URGENTE_MIN_PPM + 3.0`) manteniendo estado crítico.
+- Si `raw_co_adc` llega a zona de saturación ADC (umbral `MQ7_ADC_SATURATION_RAW` en `.env`, default 4090), el firmware marca la condición como no confiable y aplica un valor controlado de demostración (`CO_URGENTE_MIN_PPM + 3.0`) manteniendo estado crítico. El simulador de Node-RED también respeta este umbral configurable.
 
 ## Seguridad y confiabilidad
 

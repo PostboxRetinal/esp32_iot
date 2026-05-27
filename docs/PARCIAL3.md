@@ -77,8 +77,8 @@ El dashboard principal se implementa con Bun + ReactTS en `apps/dashboard`.
 - URL local: `http://localhost:5173`
 - Consume exclusivamente la API REST de Node-RED.
 - **Alertas**: consulta periódica de `/api/alerts/recent`, categorizadas por severidad (`INFO`, `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) y mostradas mediante `sonner` con estilos CSS minimalistas. Las alertas incluyen el valor `raw_co_adc` en la descripción.
-- **Estado de nodos**: cálculo en tiempo real (`online` si `last_seen_at` >= `NOW()` - 90s, caso contrario `offline`). Cada nodo muestra tanto `co_ppm` como `raw_co_adc`.
-- **Métricas**: la tarjeta principal muestra `co_ppm` y `raw_co_adc`. El gráfico de series temporales usa doble eje Y (ppm en cian, raw ADC en ámbar).
+- **Estado de nodos**: cálculo en tiempo real (`online` si la última lectura (`sensor_readings.ingested_at`) es < 90s, caso contrario `offline`). Cada nodo muestra tanto `co_ppm` como `raw_co_adc`.
+- **Métricas**: la tarjeta principal muestra estado de servicio (DB, MQTT, broker host, topic) con indicador pulsante y timestamp del health check. Las tarjetas de resumen muestran `co_ppm` y `raw_co_adc`. El gráfico de series temporales usa doble eje Y (ppm en cian, raw ADC en ámbar).
 - **UI**: Diseño "Sleek Minimalist" con Tailwind y Shadcn/UI.
 - Enlaza Node-RED en `http://localhost:1880` como plataforma IoT de procesamiento.
 

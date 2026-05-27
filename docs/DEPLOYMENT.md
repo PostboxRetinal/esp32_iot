@@ -53,7 +53,6 @@ Servicios expuestos:
   - establecer `NR_FORCE_IMPORT=true` en `.env` y reiniciar Node-RED, o
   - eliminar el volumen `nodered_data` y volver a levantar el stack.
 
-> Importante: si ya tenías el volumen de MariaDB creado antes de esta versión, `schema.sql` no se vuelve a ejecutar automáticamente. Para incluir tablas o columnas nuevas (por ejemplo `actuator_commands` o `alerts.raw_co_adc`), aplica una migración manual o recrea el volumen `mariadb_data`.
 > Reimportación: `auto-import-entrypoint.sh` compara el hash combinado de `flows.template.json`, `seed-data.js` y `settings.js`. Si cambia cualquiera, se aplica una reimportación automática al reiniciar el contenedor de Node-RED.
 > Despliegue: usa `podman-compose --env-file .env -f podman-compose.yml down && podman-compose --env-file .env -f podman-compose.yml up --build -d` para asegurar que los cambios locales en el código y los volúmenes se propaguen correctamente.
 
@@ -72,8 +71,8 @@ Luego compilar y subir con PlatformIO, y abrir el monitor serie.
 
 - Ver mensajes JSON de telemetría en el monitor serie.
 - En Node-RED, validar que llegan mensajes de:
-  - `ESP32-GARAGE-CO-001` (hardware)
-  - `SIM-GARAGE-CO-001` (simulado)
+  - `HARDWARE_DEVICE_ID` configurado en `.env` (hardware)
+  - `SIM_DEVICE_ID` configurado en `.env` (simulado)
 - En MariaDB verificar inserciones en:
   - `sensor_readings`
   - `state_events`

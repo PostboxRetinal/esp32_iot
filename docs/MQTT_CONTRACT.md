@@ -80,12 +80,11 @@ Campos del payload de telemetría:
 
 > Nota: el firmware actual con `PubSubClient` publica con QoS 0. En este diseño, la confiabilidad se refuerza con reconexión automática, heartbeat y persistencia del lado del broker.
 
-## Identificadores de nodo esperados
+## Identificadores de nodo
 
-- Hardware: `ESP32-GARAGE-CO-001`
-- Simulado: `SIM-GARAGE-CO-001`
-
-Node-RED distingue la fuente exclusivamente por `device_id`.
+Los `device_id` se configuran via `HARDWARE_DEVICE_ID` y `SIM_DEVICE_ID` en `.env`.
+Node-RED distingue la fuente exclusivamente por `device_id` dentro del payload.
+Los ejemplos en este documento usan los valores por defecto del `.env.example`.
 
 ## Regla de los tópicos (Maqiatto)
 
