@@ -672,8 +672,8 @@ function formatLastSeen(value: string | null) {
                     <span className={`node-state-text ${device.connection_state}`}>
                       <span className={`node-state-dot ${device.connection_state}`} />
                       {device.connection_state === "online" ? "Online" : "Offline"}
+                      {device.connection_state === "offline" && <> · last seen {formatLastSeen(device.latest_reading_at)}</>}
                     </span>
-                    · last seen {formatLastSeen(device.latest_reading_at)}
                   </small>
                 </div>
                 <span>{fmt(device.latest_co_ppm, " ppm")} <small className="ml-1 opacity-50">({fmt(device.latest_raw_co_adc)})</small></span>
