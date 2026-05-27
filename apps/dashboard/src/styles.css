@@ -160,9 +160,14 @@ h1 {
 }
 
 .status-metrics {
-  align-items: center;
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.status-metrics-row {
+  display: flex;
+  gap: 16px;
 }
 
 .status-metric {
@@ -384,12 +389,11 @@ h1 {
 
 .state-chart-shell {
   position: relative;
-  padding: 12px 0;
+  padding: 4px 0;
 }
 
 .state-chart-main {
   position: relative;
-  height: 280px;
 }
 
 .state-chart-center {
@@ -453,12 +457,17 @@ h1 {
 }
 
 .state-chart-legend-item strong {
+  display: block;
   font-size: 0.8rem;
+  line-height: 1.3;
+  margin-bottom: 2px;
 }
 
 .state-chart-legend-item small {
   color: #a1a1aa;
+  display: block;
   font-size: 0.75rem;
+  line-height: 1.3;
 }
 
 .list {
@@ -645,6 +654,10 @@ h1 {
   height: 0;
 }
 
+.recharts-tooltip-wrapper {
+  z-index: 999;
+}
+
 @media (max-width: 1000px) {
   .hero { flex-direction: column; }
   .metrics { grid-template-columns: 1fr 1fr; }
@@ -716,10 +729,6 @@ h1 {
 
   .state-chart-shell {
     padding: 8px 0 0;
-  }
-
-  .state-chart-main {
-    height: 220px;
   }
 
   .state-chart-center {

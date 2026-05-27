@@ -832,7 +832,7 @@
     "type": "function",
     "z": "flow_parcial3",
     "name": "API health response",
-    "func": "const topicBase = env.get(\"MQTT_TOPIC_BASE\") || \"your_maqiatto_username/fiot/garage\";\nconst commandTopic = env.get(\"MQTT_COMMAND_TOPIC\") || `${topicBase}/commands`;\n\nmsg.payload = {\n  ok: true,\n  db: \"ok\",\n  mqtt: topicBase ? \"configured\" : \"missing_config\",\n  command_topic: commandTopic,\n  timestamp: new Date().toISOString()\n};\nreturn msg;",
+    "func": "const topicBase = env.get(\"MQTT_TOPIC_BASE\") || \"your_maqiatto_username/fiot/garage\";\nconst commandTopic = env.get(\"MQTT_COMMAND_TOPIC\") || `${topicBase}/commands`;\nconst brokerHost = env.get(\"MQTT_BROKER_HOST\") || \"not_configured\";\n\nmsg.payload = {\n  ok: true,\n  db: \"ok\",\n  mqtt: topicBase ? \"configured\" : \"missing_config\",\n  command_topic: commandTopic,\n  broker_host: brokerHost,\n  mqtt_topic: topicBase,\n  timestamp: new Date().toISOString()\n};\nreturn msg;",
     "outputs": 1,
     "noerr": 0,
     "initialize": "",

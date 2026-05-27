@@ -3,6 +3,8 @@ export type HealthStatus = {
   db: string;
   mqtt: string;
   command_topic?: string;
+  broker_host?: string;
+  mqtt_topic?: string;
   timestamp: string;
 };
 

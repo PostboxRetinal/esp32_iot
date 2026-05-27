@@ -87,6 +87,10 @@ function getTimeRangeLabel(hours: number): string {
   return timeRangePresets.find((p) => p.hours === hours)?.label ?? `${hours}h`;
 }
 
+function cleanEstadoLabel(label: string): string {
+  return label.replace(/_/g, " ");
+}
+
 function TimeRangeDropdown({ value, onChange }: { value: number; onChange: (hours: number) => void }) {
   return (
     <DropdownMenu>
@@ -203,11 +207,13 @@ function StateChartTooltip({ active, payload, total }: StateChartTooltipProps) {
 
   return (
     <div className="chart-tooltip">
-      <span className="chart-tooltip-swatch" style={{ background: entry.color }} />
-      <div>
+      <div className="chart-tooltip-row" style={{ marginBottom: 4 }}>
+        <span className="chart-tooltip-swatch" style={{ background: entry.color }} />
         <strong>{entry.label}</strong>
-        <small>{entry.value} registros · {percent}%</small>
       </div>
+      <small style={{ color: "#a1a1aa", display: "block", paddingLeft: 16 }}>
+        {entry.value} registros · {percent}%
+      </small>
     </div>
   );
 }
@@ -420,7 +426,7 @@ function App() {
     label: new Date(point.bucket).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
   }));
   const stateChartData = data.states.map((entry) => ({
-    label: entry.estado,
+    label: cleanEstadoLabel(entry.estado),
     value: entry.total,
     color: getStateColor(entry.estado)
   })).filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value);
@@ -430,8 +436,8 @@ function App() {
   const ventilationOffLabel = commandBusy ? "Enviando..." : "Apagar";
   const pendingAlerts = data.alerts.filter((alert) => alert.ack_status === "PENDING" && !readAlertIds.has(alert.id));
   const pendingAlertsLabel = pendingAlerts.length === 1 ? "1 pendiente" : `${pendingAlerts.length} pendientes`;
-  const lineChartHeight = compactLayout ? 220 : 260;
-  const donutChartHeight = compactLayout ? 220 : 250;
+  const lineChartHeight = compactLayout ? 220 : 280;
+  const donutChartHeight = compactLayout ? 220 : 280;
   const donutInnerRadius = compactLayout ? 60 : 70;
   const donutOuterRadius = compactLayout ? 90 : 100;
 
@@ -551,8 +557,14 @@ function formatLastSeen(value: string | null) {
               )}
             </div>
             <div className="status-metrics">
-              <span className="status-metric">DB: {data.health?.db ?? "—"}</span>
-              <span className="status-metric">MQTT: {data.health?.mqtt ?? "—"}</span>
+              <div className="status-metrics-row">
+                <span className="status-metric">DB: {data.health?.db ?? "—"}</span>
+                <span className="status-metric">MQTT: {data.health?.mqtt ?? "—"}</span>
+              </div>
+              <div className="status-metrics-row">
+                <span className="status-metric">Broker: {data.health?.broker_host ?? "—"}</span>
+                <span className="status-metric">Topic: {data.health?.mqtt_topic ?? "—"}</span>
+              </div>
               <span className="status-metric api">{api.baseUrl}</span>
             </div>
           </div>
@@ -588,7 +600,7 @@ function formatLastSeen(value: string | null) {
       <section className="grid two">
         <Card className="panel chart-panel">
           <div className="panel-head">
-            <h2>Nivel de CO - raw ADC por minuto</h2>
+            <h2>Nivel de CO / lectura ADC RAW</h2>
             <div className="panel-actions">
               <span>{getTimeRangeLabel(timeRangeHours)}</span>
               <TimeRangeDropdown value={timeRangeHours} onChange={setTimeRangeHours} />
@@ -626,7 +638,7 @@ function formatLastSeen(value: string | null) {
           <div className="panel-head">
             <h2>Distribución de estados</h2>
             <div className="panel-actions">
-              <span>{getTimeRangeLabel(timeRangeHours)} · {selectedScopeLabel}</span>
+              <span>clasificación server-side · {selectedScopeLabel}</span>
               <TimeRangeDropdown value={timeRangeHours} onChange={setTimeRangeHours} />
             </div>
           </div>
@@ -730,15 +742,16 @@ function formatLastSeen(value: string | null) {
                       </DropdownMenuRadioItem>
                       {data.devices.map((device) => (
                         <DropdownMenuRadioItem className="items-start py-2" key={device.device_id} value={device.device_id}>
-                          <div className="flex min-w-0 flex-col items-start gap-0.5">
+                          <div className="flex min-w-0 flex-col items-start gap-1">
                             <span className="truncate font-medium text-white">{device.device_id}</span>
-                            <span className="flex items-center gap-2 text-xs text-slate-300">
+                            <span className="flex items-center gap-1.5 text-xs">
                               <span className={`node-state-dot ${device.connection_state}`} />
-                              <span>{device.connection_state}</span>
-                              <span>·</span>
-                              <span>{device.node_type}</span>
-                              <span>·</span>
-                              <span>{fmt(device.latest_co_ppm, " ppm")} · Raw: {fmt(device.latest_raw_co_adc)}</span>
+                              <span className={device.connection_state === "online" ? "font-semibold text-emerald-400" : "font-semibold text-red-400"}>{device.connection_state === "online" ? "Online" : "Offline"}</span>
+                              <span className="text-slate-500">·</span>
+                              <span className={device.latest_estado ? "font-semibold text-white" : "text-slate-400"}>{cleanEstadoLabel(device.latest_estado || "sin estado")}</span>
+                            </span>
+                            <span className="text-xs text-slate-400">
+                              {device.node_type} · {fmt(device.latest_co_ppm, " ppm")} · Raw: {fmt(device.latest_raw_co_adc)}
                             </span>
                           </div>
                         </DropdownMenuRadioItem>
@@ -766,7 +779,7 @@ function formatLastSeen(value: string | null) {
               >
                 <div>
                   <strong>{device.device_id}</strong>
-                  <small>{device.node_type} · {device.latest_estado || "sin estado"}</small>
+                  <small>{device.node_type} · {cleanEstadoLabel(device.latest_estado || "sin estado")}</small>
                   <small className="status-line">
                     <span className={`node-state-text ${device.connection_state}`}>
                       <span className={`node-state-dot ${device.connection_state}`} />
@@ -783,7 +796,7 @@ function formatLastSeen(value: string | null) {
 
         <Card className="panel controls">
           <div className="panel-head">
-            <h2>Ventilación</h2>
+            <h2>Actuación (Ventilación)</h2>
             <span>MQTT</span>
           </div>
           <p>Publica comandos manuales y deja auditoría en MariaDB.</p>

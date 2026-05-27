@@ -83,6 +83,7 @@ services:
       - ./apps/dashboard/index.html:/app/index.html:ro,Z
     depends_on:
       - nodered
+      - mariadb
 
 volumes:
   mariadb_data:

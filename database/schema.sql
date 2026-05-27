@@ -88,10 +88,3 @@
     INDEX idx_command_actuator_status (actuator, status)
   ) ENGINE=InnoDB;
 
-  INSERT INTO devices (device_id, node_type, description)
-  VALUES
-    ('ESP32-GARAGE-CO-001', 'hardware', 'ESP32-S3 N16R8 hardware node'),
-    ('SIM-GARAGE-CO-001', 'simulated', 'Node-RED simulated node')
-  ON DUPLICATE KEY UPDATE
-    node_type = VALUES(node_type),
-    description = VALUES(description);
