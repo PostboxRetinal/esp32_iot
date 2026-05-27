@@ -122,8 +122,57 @@ h1 {
   padding: 12px 20px;
 }
 
-.status-card > div {
+.status-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   min-width: 0;
+}
+
+.status-head {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.status-pulse {
+  border-radius: 999px;
+  flex-shrink: 0;
+  height: 8px;
+  width: 8px;
+}
+
+.status-pulse.ok {
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+.status-pulse.bad {
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+}
+
+.status-ts {
+  color: #525252;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.65rem;
+  margin-left: auto;
+}
+
+.status-metrics {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.status-metric {
+  color: #a1a1aa;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.72rem;
+}
+
+.status-metric.api {
+  color: #525252;
 }
 
 .status-card strong,

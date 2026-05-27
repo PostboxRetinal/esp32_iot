@@ -78,6 +78,9 @@ services:
       VITE_API_BEARER_TOKEN: ${API_BEARER_TOKEN:-}
     ports:
       - "${DASHBOARD_PORT:-5173}:5173"
+    volumes:
+      - ./apps/dashboard/src:/app/src:ro,Z
+      - ./apps/dashboard/index.html:/app/index.html:ro,Z
     depends_on:
       - nodered
 

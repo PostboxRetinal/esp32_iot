@@ -12,7 +12,7 @@ import {
   XAxis,
   YAxis
 } from "recharts";
-import { Bell, ChevronDown, ExternalLink } from "lucide-react";
+import { Bell, ChevronDown, Clock, ExternalLink } from "lucide-react";
 import { Toaster, toast } from "sonner";
 
 import "@fontsource/jetbrains-mono/latin-400.css";
@@ -71,6 +71,52 @@ function getStateColor(state: string) {
   }
 
   return statePalette[state] || "#94a3b8";
+}
+
+type TimeRangePreset = { label: string; hours: number };
+const timeRangePresets: TimeRangePreset[] = [
+  { label: "1h", hours: 1 },
+  { label: "6h", hours: 6 },
+  { label: "12h", hours: 12 },
+  { label: "24h", hours: 24 },
+  { label: "7d", hours: 168 },
+  { label: "30d", hours: 720 },
+];
+
+function getTimeRangeLabel(hours: number): string {
+  return timeRangePresets.find((p) => p.hours === hours)?.label ?? `${hours}h`;
+}
+
+function TimeRangeDropdown({ value, onChange }: { value: number; onChange: (hours: number) => void }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1 border-[var(--border)] bg-[#0a0a0a] text-xs text-[var(--muted-foreground)] hover:bg-[var(--accent)] hover:text-[var(--foreground)]"
+        >
+          <Clock className="h-3.5 w-3.5" />
+          {getTimeRangeLabel(value)}
+          <ChevronDown className="h-3 w-3 opacity-50" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[8rem] border-[var(--border)] bg-[var(--popover)] p-1 text-[var(--popover-foreground)] shadow-none">
+        <DropdownMenuLabel className="p-0 px-2 pb-1 pt-1 text-xs font-semibold text-white">Período</DropdownMenuLabel>
+        <DropdownMenuSeparator className="mx-1 my-1 bg-[var(--border)]" />
+        <DropdownMenuRadioGroup
+          value={String(value)}
+          onValueChange={(v) => onChange(Number(v))}
+        >
+          {timeRangePresets.map((preset) => (
+            <DropdownMenuRadioItem key={preset.hours} className="py-1.5 text-xs text-[var(--foreground)]" value={String(preset.hours)}>
+              {preset.label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 const alertToastThemes: Record<Alert["severity"], AlertToastTheme> = {
@@ -182,6 +228,7 @@ function App() {
     }
   });
   const [reloadTick, setReloadTick] = useState(0);
+  const [timeRangeHours, setTimeRangeHours] = useState(24);
   const [compactLayout, setCompactLayout] = useState(() => window.innerWidth < 640);
   const seenAlertSignatures = useRef(new Set<string>());
   const hydratedAlerts = useRef(false);
@@ -249,10 +296,10 @@ function App() {
         const scopeDeviceId = liveSelectedDeviceId || undefined;
         const [readings, alerts, summary, states, timeseries] = await Promise.all([
           api.latestReadings(40, scopeDeviceId),
-          api.recentAlerts(24, 20, scopeDeviceId),
-          api.summary(24, scopeDeviceId),
-          api.stateDistribution(24, scopeDeviceId),
-          api.timeseries(24, scopeDeviceId)
+          api.recentAlerts(timeRangeHours, 20, scopeDeviceId),
+          api.summary(timeRangeHours, scopeDeviceId),
+          api.stateDistribution(timeRangeHours, scopeDeviceId),
+          api.timeseries(timeRangeHours, scopeDeviceId)
         ]);
 
         if (!active) {
@@ -312,7 +359,7 @@ function App() {
       active = false;
       window.clearInterval(interval);
     };
-  }, [selectedDeviceId, reloadTick]);
+  }, [selectedDeviceId, reloadTick, timeRangeHours]);
 
   async function sendVentilation(action: "ENCENDER" | "APAGAR") {
     setCommandBusy(true);
@@ -349,7 +396,8 @@ function App() {
   const selectedScopeLabel = selectedDevice?.device_id || "Todos los nodos";
   const selectorValue = selectedDevice ? selectedDeviceId : allDevicesValue;
   const summary = data.summary;
-  const series = [...data.timeseries].slice(-80).map((point) => ({
+  const timeseriesWindow = Math.max(80, Math.min(timeRangeHours * 3, data.timeseries.length));
+  const series = [...data.timeseries].slice(-timeseriesWindow).map((point) => ({
     ...point,
     label: new Date(point.bucket).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
   }));
@@ -476,10 +524,19 @@ function formatLastSeen(value: string | null) {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <span className={data.health?.ok ? "status-dot ok" : "status-dot bad"} />
-          <div>
-            <strong>{data.health?.ok ? "Estado: Operativo" : "Alerta de Sistema"}</strong>
-            <small>API: {api.baseUrl}</small>
+          <div className="status-info">
+            <div className="status-head">
+              <span className={`status-pulse ${data.health?.ok ? "ok" : "bad"}`} />
+              <strong>{data.health?.ok ? "Operativo" : "Alerta de Sistema"}</strong>
+              {data.health?.timestamp && (
+                <span className="status-ts">{new Date(data.health.timestamp).toLocaleTimeString()}</span>
+              )}
+            </div>
+            <div className="status-metrics">
+              <span className="status-metric">DB: {data.health?.db ?? "—"}</span>
+              <span className="status-metric">MQTT: {data.health?.mqtt ?? "—"}</span>
+              <span className="status-metric api">{api.baseUrl}</span>
+            </div>
           </div>
         </Card>
       </header>
@@ -514,7 +571,10 @@ function formatLastSeen(value: string | null) {
         <Card className="panel chart-panel">
           <div className="panel-head">
             <h2>Nivel de CO - raw ADC por minuto</h2>
-            <span>últimas 24h</span>
+            <div className="panel-actions">
+              <span>{getTimeRangeLabel(timeRangeHours)}</span>
+              <TimeRangeDropdown value={timeRangeHours} onChange={setTimeRangeHours} />
+            </div>
           </div>
           <ResponsiveContainer width="100%" height={lineChartHeight}>
             <LineChart data={series}>
@@ -533,7 +593,10 @@ function formatLastSeen(value: string | null) {
         <Card className="panel chart-panel">
           <div className="panel-head">
             <h2>Distribución de estados</h2>
-            <span>clasificación server-side · {selectedScopeLabel}</span>
+            <div className="panel-actions">
+              <span>{getTimeRangeLabel(timeRangeHours)} · {selectedScopeLabel}</span>
+              <TimeRangeDropdown value={timeRangeHours} onChange={setTimeRangeHours} />
+            </div>
           </div>
           {stateChartData.length > 0 ? (
             <div className="state-chart-shell">
