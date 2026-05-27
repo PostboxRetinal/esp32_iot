@@ -212,6 +212,24 @@ function StateChartTooltip({ active, payload, total }: StateChartTooltipProps) {
   );
 }
 
+function LineChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string; dataKey: string }>; label?: string }) {
+  if (!active || !payload?.length) {
+    return null;
+  }
+
+  return (
+    <div className="chart-tooltip chart-tooltip-line">
+      <small className="chart-tooltip-label">{label}</small>
+      {payload.map((entry) => (
+        <div key={entry.dataKey} className="chart-tooltip-row">
+          <span className="chart-tooltip-swatch" style={{ background: entry.color }} />
+          <span>{entry.name}: <strong>{entry.dataKey === "avg_raw_co_adc" ? Math.round(entry.value) : typeof entry.value === "number" ? entry.value.toFixed(1) : entry.value}</strong></span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function App() {
   const [data, setData] = useState<DashboardData>(initialData);
   const [loading, setLoading] = useState(true);
@@ -582,12 +600,26 @@ function formatLastSeen(value: string | null) {
               <XAxis dataKey="label" stroke="#94a3b8" minTickGap={28} tickLine={false} axisLine={false} />
               <YAxis yAxisId="left" stroke="#94a3b8" tickLine={false} axisLine={false} />
               <YAxis yAxisId="raw" orientation="right" stroke="#f59e0b" tickLine={false} axisLine={false} tickFormatter={(value) => `${Math.round(Number(value))}`} />
-              <Tooltip contentStyle={{ background: "#111827", border: "1px solid #243041", borderRadius: 12 }} />
+              <Tooltip content={<LineChartTooltip />} />
               <Line yAxisId="left" type="monotone" dataKey="avg_co_ppm" name="CO promedio (ppm)" stroke="#38bdf8" strokeWidth={2.5} dot={false} />
               <Line yAxisId="left" type="monotone" dataKey="max_co_ppm" name="CO max (ppm)" stroke="#fb7185" strokeWidth={2} dot={false} />
               <Line yAxisId="raw" type="monotone" dataKey="avg_raw_co_adc" name="Raw CO (ADC)" stroke="#f59e0b" strokeWidth={1.8} strokeDasharray="6 4" dot={false} />
             </LineChart>
           </ResponsiveContainer>
+          <div className="chart-legend">
+            <span className="chart-legend-item">
+              <span className="chart-legend-swatch" style={{ background: "#38bdf8" }} />
+              CO promedio (ppm)
+            </span>
+            <span className="chart-legend-item">
+              <span className="chart-legend-swatch" style={{ background: "#fb7185" }} />
+              CO max (ppm)
+            </span>
+            <span className="chart-legend-item">
+              <span className="chart-legend-swatch dashed" style={{ borderColor: "#f59e0b" }} />
+              Raw CO (ADC)
+            </span>
+          </div>
         </Card>
 
         <Card className="panel chart-panel">
@@ -762,7 +794,7 @@ function formatLastSeen(value: string | null) {
         </Card>
       </section>
       <Toaster
-        position="top-right"
+        position="bottom-right"
         theme="dark"
         toastOptions={{
           style: {

@@ -574,6 +574,77 @@ h1 {
   color: rgba(255, 255, 255, 0.78);
 }
 
+.chart-tooltip {
+  background: #111827;
+  border: 1px solid #243041;
+  border-radius: 12px;
+  padding: 10px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.chart-tooltip.chart-tooltip-line {
+  min-width: 180px;
+}
+
+.chart-tooltip-label {
+  color: #a1a1aa;
+  display: block;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.68rem;
+  margin-bottom: 8px;
+}
+
+.chart-tooltip-row {
+  align-items: center;
+  color: #fafafa;
+  display: flex;
+  font-size: 0.78rem;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.chart-tooltip-row + .chart-tooltip-row {
+  margin-top: 4px;
+}
+
+.chart-tooltip-swatch {
+  border-radius: 999px;
+  flex-shrink: 0;
+  height: 8px;
+  width: 8px;
+}
+
+.chart-legend {
+  border-top: 1px solid #171717;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  justify-content: center;
+  margin-top: 14px;
+  padding-top: 12px;
+}
+
+.chart-legend-item {
+  align-items: center;
+  color: #a1a1aa;
+  display: flex;
+  font-size: 0.72rem;
+  gap: 8px;
+}
+
+.chart-legend-swatch {
+  border-radius: 2px;
+  flex-shrink: 0;
+  height: 3px;
+  width: 18px;
+}
+
+.chart-legend-swatch.dashed {
+  background: transparent;
+  border-top: 3px dashed;
+  height: 0;
+}
+
 @media (max-width: 1000px) {
   .hero { flex-direction: column; }
   .metrics { grid-template-columns: 1fr 1fr; }
@@ -709,5 +780,18 @@ h1 {
 
   .banner {
     margin-bottom: 16px;
+  }
+
+  .chart-legend {
+    gap: 12px;
+  }
+
+  .chart-legend-item {
+    font-size: 0.65rem;
+    gap: 6px;
+  }
+
+  .chart-legend-swatch {
+    width: 14px;
   }
 }
