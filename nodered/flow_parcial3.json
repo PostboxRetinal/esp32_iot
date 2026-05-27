@@ -1495,7 +1495,7 @@
     "type": "function",
     "z": "flow_parcial3",
     "name": "API ventilation command",
-    "func": "const body = (typeof msg.payload === \"object\" && msg.payload !== null) ? msg.payload : {};\nconst action = String(body.action || \"\").trim().toUpperCase();\n\nif (action !== \"ENCENDER\" && action !== \"APAGAR\") {\n  msg.statusCode = 400;\n  msg.payload = { error: \"validation_error\", message: \"action must be ENCENDER or APAGAR\" };\n  return [msg, null, null];\n}\n\nconst topicBase = env.get(\"MQTT_TOPIC_BASE\") || \"your_maqiatto_username/fiot/garage\";\nconst commandTopic = env.get(\"MQTT_COMMAND_TOPIC\") || `${topicBase}/commands`;\nconst timestamp = new Date().toISOString();\nconst deviceId = String(body.device_id || env.get(\"HARDWARE_DEVICE_ID\") || \"ESP32-GARAGE-CO-001\").trim();\nconst reason = String(body.reason || \"Comando manual desde dashboard\").trim().slice(0, 255);\nconst command = {\n  device_id: deviceId,\n  timestamp,\n  actuator: \"VENTILACION\",\n  action,\n  reason,\n  source: \"node-red-api\"\n};\n\nconst sqlMsg = { ...msg };\nsqlMsg.commandPayload = command;\nsqlMsg.mqtt_topic = commandTopic;\nsqlMsg.topic = `\n  INSERT INTO actuator_commands\n    (device_id, device_timestamp, actuator, action, reason, source_state, status)\n  VALUES (?, ?, ?, ?, ?, ?, ?)\n`;\nsqlMsg.payload = [deviceId, timestamp, \"VENTILACION\", action, reason, \"MANUAL_API\", \"PUBLISHED\"];\n\nconst mqttMsg = { ...msg };\nmqttMsg.topic = commandTopic;\nmqttMsg.payload = command;\n\nreturn [null, sqlMsg, mqttMsg];",
+    "func": "const body = (typeof msg.payload === \"object\" && msg.payload !== null) ? msg.payload : {};\nconst action = String(body.action || \"\").trim().toUpperCase();\n\nif (action !== \"ENCENDER\" && action !== \"APAGAR\") {\n  msg.statusCode = 400;\n  msg.payload = { error: \"validation_error\", message: \"action must be ENCENDER or APAGAR\" };\n  return [msg, null, null];\n}\n\nconst topicBase = env.get(\"MQTT_TOPIC_BASE\") || \"your_maqiatto_username/fiot/garage\";\nconst commandTopic = env.get(\"MQTT_COMMAND_TOPIC\") || topicBase + \"/commands\";\nconst timestamp = new Date().toISOString();\nconst deviceId = String(body.device_id || env.get(\"HARDWARE_DEVICE_ID\") || \"ESP32-GARAGE-CO-001\").trim();\nconst reason = String(body.reason || \"Comando manual desde dashboard\").trim().slice(0, 255);\nconst command = {\n  device_id: deviceId,\n  timestamp,\n  actuator: \"VENTILACION\",\n  action,\n  reason,\n  source: \"node-red-api\"\n};\n\nconst sqlMsg = { ...msg };\nsqlMsg.commandPayload = command;\nsqlMsg.mqtt_topic = commandTopic;\n\n// Save command insert for after the device upsert\nsqlMsg._cmdTopic = \"INSERT INTO actuator_commands\\n    (device_id, device_timestamp, actuator, action, reason, source_state, status)\\n  VALUES (?, ?, ?, ?, ?, ?, ?)\";\nsqlMsg._cmdPayload = [deviceId, timestamp, \"VENTILACION\", action, reason, \"MANUAL_API\", \"PUBLISHED\"];\n\n// Output device upsert first\nsqlMsg.topic = \"INSERT INTO devices (device_id, node_type, description, last_seen_at)\\n  VALUES (?, 'hardware', 'API command device', NOW(3))\\n  ON DUPLICATE KEY UPDATE last_seen_at = NOW(3)\";\nsqlMsg.payload = [deviceId];\n\nconst mqttMsg = { ...msg };\nmqttMsg.topic = commandTopic;\nmqttMsg.payload = command;\n\nreturn [null, sqlMsg, mqttMsg];",
     "outputs": 3,
     "noerr": 0,
     "initialize": "",
@@ -1508,7 +1508,7 @@
         "fn_api_response_headers"
       ],
       [
-        "sql_api_post_ventilation"
+        "sql_upsert_device_for_command"
       ],
       [
         "mqtt_out_api_commands"
@@ -1708,5 +1708,38 @@
       "user": "${MARIADB_USER}",
       "password": "${MARIADB_PASSWORD}"
     }
+  },
+  {
+    "id": "sql_upsert_device_for_command",
+    "type": "mysql",
+    "z": "flow_parcial3",
+    "mydb": "cfg_mysql",
+    "name": "Upsert device for command",
+    "x": 730,
+    "y": 1420,
+    "wires": [
+      [
+        "fn_restore_command_insert"
+      ]
+    ]
+  },
+  {
+    "id": "fn_restore_command_insert",
+    "type": "function",
+    "z": "flow_parcial3",
+    "name": "Restore command insert",
+    "func": "msg.topic = msg._cmdTopic;\nmsg.payload = msg._cmdPayload;\ndelete msg._cmdTopic;\ndelete msg._cmdPayload;\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 940,
+    "y": 1420,
+    "wires": [
+      [
+        "sql_api_post_ventilation"
+      ]
+    ]
   }
 ]

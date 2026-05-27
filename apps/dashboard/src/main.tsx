@@ -318,9 +318,13 @@ function App() {
     setCommandBusy(true);
     try {
       await api.ventilation(action);
+      toast.success(`Ventilación: ${action === "ENCENDER" ? "Encendido" : "Apagado"}`, {
+        description: "Comando publicado vía MQTT"
+      });
       setReloadTick((tick) => tick + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      toast.error("Error al enviar comando de ventilación");
     } finally {
       setCommandBusy(false);
     }
@@ -509,8 +513,8 @@ function formatLastSeen(value: string | null) {
       <section className="grid two">
         <Card className="panel chart-panel">
           <div className="panel-head">
-            <h2>Nivel de Monóxido de Carbono (CO) / raw ADC por minuto</h2>
-            <span>últimas 24h · {selectedScopeLabel}</span>
+            <h2>Nivel de CO - raw ADC por minuto</h2>
+            <span>últimas 24h</span>
           </div>
           <ResponsiveContainer width="100%" height={lineChartHeight}>
             <LineChart data={series}>
@@ -695,7 +699,6 @@ function formatLastSeen(value: string | null) {
         </Card>
       </section>
       <Toaster
-        closeButton
         position="top-right"
         theme="dark"
         toastOptions={{
